@@ -1,0 +1,13 @@
+{
+  "name": "HomeLedger",
+  "short_name": "HomeLedger",
+  "description": "Private home income and expense tracking.",
+  "start_url": "./?page=dashboard",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#080b0f",
+  "theme_color": "#080b0f",
+  "icons": [
+    { "src": "assets/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
