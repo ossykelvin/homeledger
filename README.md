@@ -93,6 +93,8 @@ Requirements: PHP 8.1 or later, MySQL 8 or MariaDB 10.6 or later, and the PDO My
 6. Configure the variables shown in `.env.example` through the hosting control panel or Apache environment configuration.
 7. Use HTTPS before installing the PWA or making the site available beyond localhost. Create the owner account on first visit.
 
+For Namecheap cPanel Git Version Control, keep the clone at `~/homeledger` and the document root at `~/homeledger/public` (not `public_html`). `.cpanel.yml` copies `app`, `templates`, `public`, `scripts`, and `database` into `$HOME/homeledger` when the Git clone is a separate folder. If the clone is already that path, deploy is a no-op after pull. It never copies `.env` and never imports `schema.sql` or runs migrations. After a GitHub push: cPanel → Files → Git Version Control → Manage → **Update from Remote**, then **Deploy HEAD Commit**. If cPanel still reports uncommitted changes, those are local edits on the server checkout (often leftover File Manager uploads). Discard tracked files there and leave `.env` untracked. Do not commit `.env` from the server. Apply `database/migrations/007_email_confirmation.sql` and `008_household_owner_user.sql` in phpMyAdmin yourself.
+
 The `.env.example` file documents the expected values. The application reads real operating-system environment variables and does not load `.env` files by itself.
 
 ## Install it as a desktop application

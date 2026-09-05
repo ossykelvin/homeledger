@@ -1,0 +1,9 @@
+---
+# HomeLedger cPanel Git deploy.
+# Document root stays ~/homeledger/public (not public_html).
+# Copies app trees only. Never copies .env. Does not run SQL.
+deployment:
+  tasks:
+    - export DEPLOYPATH=$HOME/homeledger
+    - test "$PWD" -ef "$DEPLOYPATH" && /bin/echo already_at_live_tree || /bin/mkdir -p "$DEPLOYPATH"
+    - test "$PWD" -ef "$DEPLOYPATH" || /bin/cp -Rf app templates public scripts database "$DEPLOYPATH/"
