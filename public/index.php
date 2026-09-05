@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     handle_post_action();
 }
 
-$publicPages = ['login', 'setup', 'register'];
+$publicPages = ['login', 'setup', 'register', 'check-email'];
 $appPages = ['dashboard', 'transactions', 'recurring', 'statement', 'household'];
 $page = is_string($_GET['page'] ?? null) ? $_GET['page'] : 'dashboard';
 $currentUser = null;
@@ -47,6 +47,10 @@ if ($legacyStatement) {
 $legacyInvite = $page === 'invite';
 if ($legacyInvite) {
     $page = 'household';
+}
+
+if (!$setupError && $page === 'confirm') {
+    complete_email_confirmation_from_query();
 }
 
 if (!$setupError) {
@@ -113,6 +117,7 @@ $titles = [
     'not-found' => 'Page not found',
     'login' => 'Sign in',
     'register' => 'Create your household',
+    'check-email' => 'Confirm your email',
     'setup' => 'Create your household',
 ];
 $pageTitle = $titles[$page] ?? 'HomeLedger';

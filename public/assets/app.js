@@ -59,6 +59,12 @@
         openDialog(dialog, false);
         return;
       }
+      if (dialog?.id === 'delete-account-dialog') {
+        closeDialog(document.getElementById('profile-dialog'));
+        openDialog(dialog);
+        syncDeleteAccountForm(dialog);
+        return;
+      }
       if (dialog?.id === 'transaction-dialog') {
         const title = dialog.querySelector('#transaction-dialog-title');
         if (title) title.textContent = 'Add transaction';
@@ -147,11 +153,36 @@
     });
   });
 
+  const syncDeleteAccountForm = (dialog) => {
+    const form = dialog?.querySelector('form');
+    if (!form) return;
+    const expected = (dialog.dataset.householdCode || '').replace(/[\s-]/g, '').toUpperCase();
+    const typed = (form.querySelector('[name="confirm_household_id"]')?.value || '').replace(/[\s-]/g, '').toUpperCase();
+    const needsTransfer = form.dataset.needsTransfer === '1';
+    const transfer = form.querySelector('[name="transfer_user_id"]:checked');
+    const submit = form.querySelector('[type="submit"]');
+    if (submit) submit.disabled = !(expected !== '' && typed === expected && (!needsTransfer || !!transfer));
+  };
+
+  const deleteDialog = document.getElementById('delete-account-dialog');
+  if (deleteDialog) {
+    deleteDialog.querySelector('[name="confirm_household_id"]')?.addEventListener('input', () => syncDeleteAccountForm(deleteDialog));
+    deleteDialog.querySelectorAll('[name="transfer_user_id"]').forEach((input) => {
+      input.addEventListener('change', () => syncDeleteAccountForm(deleteDialog));
+    });
+    deleteDialog.querySelector('form')?.addEventListener('reset', () => requestAnimationFrame(() => syncDeleteAccountForm(deleteDialog)));
+    syncDeleteAccountForm(deleteDialog);
+  }
+
   const toast = document.querySelector('[data-toast]');
   toast?.querySelector('button')?.addEventListener('click', () => toast.remove());
   if (toast) window.setTimeout(() => toast.remove(), 5000);
 
-  if (new URLSearchParams(window.location.search).get('profile') === '1') {
+  if (new URLSearchParams(window.location.search).get('delete') === '1') {
+    const dialog = document.getElementById('delete-account-dialog');
+    openDialog(dialog, false);
+    syncDeleteAccountForm(dialog);
+  } else if (new URLSearchParams(window.location.search).get('profile') === '1') {
     openDialog(document.getElementById('profile-dialog'), false);
   }
 

@@ -72,12 +72,31 @@ function household_members_for_current(): array
 function household_owner_user_id(?int $householdId = null): int
 {
     $householdId = $householdId ?? current_household_id();
-    $stmt = db()->prepare(
+    $stmt = db()->prepare('SELECT owner_user_id FROM households WHERE id = ?');
+    $stmt->execute([$householdId]);
+    $ownerId = (int) $stmt->fetchColumn();
+
+    if ($ownerId > 0) {
+        $member = db()->prepare(
+            'SELECT id FROM users WHERE id = ? AND household_id = ?'
+        );
+        $member->execute([$ownerId, $householdId]);
+        if ((int) $member->fetchColumn() === $ownerId) {
+            return $ownerId;
+        }
+    }
+
+    $fallback = db()->prepare(
         'SELECT id FROM users WHERE household_id = ? ORDER BY created_at ASC, id ASC LIMIT 1'
     );
-    $stmt->execute([$householdId]);
+    $fallback->execute([$householdId]);
+    $repaired = (int) $fallback->fetchColumn();
+    if ($repaired > 0 && $repaired !== $ownerId) {
+        $repair = db()->prepare('UPDATE households SET owner_user_id = ? WHERE id = ?');
+        $repair->execute([$repaired, $householdId]);
+    }
 
-    return (int) $stmt->fetchColumn();
+    return $repaired;
 }
 
 function current_user_is_household_owner(): bool
@@ -211,7 +230,7 @@ function authenticate_with_password(string $email, string $password): void
     }
 
     $stmt = db()->prepare(
-        'SELECT id, login, password_hash, failed_attempts, locked_until FROM users WHERE login = ?'
+        'SELECT id, login, password_hash, failed_attempts, locked_until, email_verified_at FROM users WHERE login = ?'
     );
     $stmt->execute([$login]);
     $user = $stmt->fetch();
@@ -243,6 +262,14 @@ function authenticate_with_password(string $email, string $password): void
     $reset = db()->prepare('UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?');
     $reset->execute([(int) $user['id']]);
 
+    if (empty($user['email_verified_at'])) {
+        $_SESSION['pending_email_confirm'] = $login;
+        throw new InvalidArgumentException(
+            'Confirm this email to activate HomeLedger. Check your inbox or resend the confirmation email.'
+        );
+    }
+
+    unset($_SESSION['pending_email_confirm']);
     establish_user_session((int) $user['id']);
 }
 
@@ -298,6 +325,9 @@ function adopt_or_create_household(PDO $pdo, string $name): int
     throw new RuntimeException('Could not allocate a household ID.');
 }
 
+/**
+ * @return array{id: int, login: string, confirm_token: ?string, confirm_expires: ?DateTimeImmutable}
+ */
 function create_household_owner(
     string $displayName,
     string $email,
@@ -305,7 +335,7 @@ function create_household_owner(
     string $confirm,
     string $householdName = '',
     string $rawInvite = ''
-): int {
+): array {
     prune_login_attempts();
     if (ip_login_blocked()) {
         throw new InvalidArgumentException(AUTH_LOCK_MESSAGE);
@@ -336,19 +366,44 @@ function create_household_owner(
         throw new InvalidArgumentException('An account with that email already exists. Sign in instead.');
     }
 
+    $confirmToken = null;
+    $confirmExpires = null;
     $pdo->beginTransaction();
     try {
         if ($rawInvite !== '') {
             $householdId = accept_open_invite($pdo, $rawInvite, $login);
+            $verifiedAt = (new DateTimeImmutable())->format('Y-m-d H:i:s');
+            $tokenHash = null;
+            $tokenExpires = null;
         } else {
             $householdName = household_name_from_display($displayName, $householdName);
             $householdId = adopt_or_create_household($pdo, $householdName);
+            $verifiedAt = null;
+            $confirmToken = bin2hex(random_bytes(32));
+            $confirmExpires = new DateTimeImmutable('+' . EMAIL_CONFIRM_TTL_HOURS . ' hours');
+            $tokenHash = hash_email_confirm_token($confirmToken);
+            $tokenExpires = $confirmExpires->format('Y-m-d H:i:s');
         }
         $stmt = $pdo->prepare(
-            'INSERT INTO users (household_id, login, display_name, password_hash) VALUES (?, ?, ?, ?)'
+            'INSERT INTO users
+                (household_id, login, display_name, password_hash, email_verified_at,
+                 email_confirm_token_hash, email_confirm_expires_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)'
         );
-        $stmt->execute([$householdId, $login, $displayName, password_hash($password, PASSWORD_DEFAULT)]);
+        $stmt->execute([
+            $householdId,
+            $login,
+            $displayName,
+            password_hash($password, PASSWORD_DEFAULT),
+            $verifiedAt,
+            $tokenHash,
+            $tokenExpires,
+        ]);
         $userId = (int) $pdo->lastInsertId();
+        if ($rawInvite === '') {
+            $setOwner = $pdo->prepare('UPDATE households SET owner_user_id = ? WHERE id = ?');
+            $setOwner->execute([$userId, $householdId]);
+        }
         $pdo->commit();
     } catch (Throwable $exception) {
         if ($pdo->inTransaction()) {
@@ -357,7 +412,12 @@ function create_household_owner(
         throw $exception;
     }
 
-    return $userId;
+    return [
+        'id' => $userId,
+        'login' => $login,
+        'confirm_token' => $confirmToken,
+        'confirm_expires' => $confirmExpires,
+    ];
 }
 
 function accept_open_invite(PDO $pdo, string $rawToken, string $login): int

@@ -14,9 +14,9 @@ HomeLedger is a household financial tracker built with PHP and MySQL. Each signe
 - GBP defaults, with currency and timezone controlled through environment variables
 - Responsive light and dark modes based on the supplied Kokoszone theme
 - Installable desktop experience for Chrome and Microsoft Edge
-- Household sign-in and registration, with every money row scoped to a `household_id`
+- Household sign-in and registration. New households confirm email before first sign-in. Invite joins skip that extra email. Every money row is scoped to a `household_id`.
 - Household hub (`?page=household`): name, public household ID, members, and 24-hour invites with resend. `?page=invite` redirects here.
-- Settings: signed-in users open the profile icon in the top bar to change display name, household name, and password. Email and household ID are read-only.
+- Settings: signed-in users open the profile icon in the top bar to change display name, household name, and password, or to permanently delete their account. Email and household ID are read-only.
 - Prepared statements, output escaping, CSRF protection and server-side validation
 
 ## Fastest setup with Docker
@@ -39,6 +39,9 @@ Requirements: Docker Desktop with Docker Compose.
    Get-Content -Raw .\database\migrations\004_household_invites.sql | docker compose exec -T db mysql -u homeledger -pchange-this-password homeledger
    Get-Content -Raw .\database\migrations\005_household_public_code.sql | docker compose exec -T db mysql -u homeledger -pchange-this-password homeledger
    docker compose exec -T app php scripts/backfill_household_codes.php
+   Get-Content -Raw .\database\migrations\006_household_state_version.sql | docker compose exec -T db mysql -u homeledger -pchange-this-password homeledger
+   Get-Content -Raw .\database\migrations\007_email_confirmation.sql | docker compose exec -T db mysql -u homeledger -pchange-this-password homeledger
+   Get-Content -Raw .\database\migrations\008_household_owner_user.sql | docker compose exec -T db mysql -u homeledger -pchange-this-password homeledger
    ```
 
    If `003` stopped mid-run, apply `003b_finish_transaction_household.sql` before `004`. Do not run `docker compose down -v`.
@@ -120,7 +123,7 @@ php scripts/process_recurring.php 2026-12-31
 
 ## Household
 
-Signed-in members open **Household** to see the household name (editable), the public household ID (read-only, `A3K9-M2PQ-7X2B-Q8NL` format), the member list, and invites. The earliest account is labelled Owner. That is a display label only; everyone still has the same access. `?page=invite` redirects to Household.
+Signed-in members open **Household** to see the household name (editable), the public household ID (read-only, `A3K9-M2PQ-7X2B-Q8NL` format), the member list, and invites. The owner is stored as `households.owner_user_id` (the household creator, or whoever later received ownership). That is a display and invite-permission label; everyone still has the same access to the ledger. `?page=invite` redirects to Household.
 
 Send a 24-hour join link from the same page. When `MAIL_*` is set, HomeLedger sends the invite over SMTP (STARTTLS). The page always shows the URL to copy. **Resend** on a pending or expired unused invite issues a new token, resets expiry to 24 hours, and retires the old link.
 
@@ -144,7 +147,7 @@ Do not run `docker compose down -v`. `BREVO_API_KEY` can sit in `.env` for a lat
 
 ## Settings
 
-Signed-in members click the profile icon in the top right to open a dialog. They can change display name, household name, or password (current password, new password, confirm, at least 12 characters). Email and the household ID (a 16-character public code such as `A3K9-M2PQ-7X2B-Q8NL`) are shown read-only. The numeric `households.id` stays internal and is not shown. `?page=settings` still opens the same dialog on Overview.
+Signed-in members click the profile icon in the top right to open a dialog. They can change display name, household name, or password (current password, new password, confirm, at least 12 characters). Email and the household ID (a 16-character public code such as `A3K9-M2PQ-7X2B-Q8NL`) are shown read-only. The numeric `households.id` stays internal and is not shown. Account deletion is also in this dialog: it is permanent, requires the household ID and current password, and transfers ownership when the owner is not the last member. `?page=settings` still opens the same dialog on Overview.
 
 ## Run the checks
 
@@ -153,6 +156,9 @@ php tests/recurrence_test.php
 php tests/statement_export_test.php
 php tests/household_code_test.php
 php tests/invite_mail_test.php
+php tests/email_confirm_test.php
+php tests/household_state_test.php
+php tests/account_delete_test.php
 find app public scripts tests templates -name '*.php' -print0 | xargs -0 -n1 php -l
 ```
 

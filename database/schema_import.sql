@@ -8,10 +8,12 @@ CREATE TABLE IF NOT EXISTS households (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(80) NOT NULL,
   public_code CHAR(19) NOT NULL,
+  owner_user_id BIGINT UNSIGNED NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   state_version BIGINT UNSIGNED NOT NULL DEFAULT 1,
-  UNIQUE KEY households_public_code_unique (public_code)
+  UNIQUE KEY households_public_code_unique (public_code),
+  KEY households_owner_user_index (owner_user_id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS users (
@@ -22,12 +24,19 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255) NOT NULL,
   failed_attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
   locked_until DATETIME NULL,
+  email_verified_at DATETIME NULL,
+  email_confirm_token_hash CHAR(64) NULL,
+  email_confirm_expires_at DATETIME NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY users_login_unique (login),
+  UNIQUE KEY users_email_confirm_token_hash_unique (email_confirm_token_hash),
   KEY users_household_index (household_id),
   CONSTRAINT user_household_fk FOREIGN KEY (household_id) REFERENCES households(id)
 ) ENGINE=InnoDB;
+
+ALTER TABLE households
+  ADD CONSTRAINT household_owner_user_fk FOREIGN KEY (owner_user_id) REFERENCES users(id);
 
 CREATE TABLE IF NOT EXISTS login_attempts (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

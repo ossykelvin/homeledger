@@ -37,7 +37,7 @@ function smtp_user_reason(Throwable $exception): string
         return 'Brevo rejected the sender. Verify noreply@kokoszone.com or the kokoszone.com domain in Brevo.';
     }
 
-    return 'The mail server could not send the invite.';
+    return 'The mail server could not send the email.';
 }
 
 function mail_from_address(): string

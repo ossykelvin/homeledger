@@ -13,7 +13,7 @@ $emailPrefill = $joining ? e($inviteEmail) : old_form('email');
         <?php if (!empty($inviteProblem)): ?>
             <p class="auth-alert" role="alert"><?= e((string) $inviteProblem) ?></p>
         <?php endif; ?>
-        <p>Each household has its own ledger. Use an email you control and a password of at least 12 characters.</p>
+        <p>Each household has its own ledger. Use an email you control and a password of at least 12 characters. We will email a confirmation link to activate HomeLedger.</p>
     <?php endif; ?>
     <form method="post" class="auth-form" autocomplete="on">
         <input type="hidden" name="_token" value="<?= e(csrf_token()) ?>">

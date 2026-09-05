@@ -6,7 +6,7 @@ function handle_post_action(): never
 {
     verify_csrf();
     $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
-    $publicActions = ['login', 'setup', 'register', 'logout'];
+    $publicActions = ['login', 'setup', 'register', 'logout', 'resend_confirmation'];
 
     if ($action === 'logout') {
         destroy_user_session();
@@ -37,6 +37,9 @@ function handle_post_action(): never
             case 'setup':
             case 'register':
                 register_household();
+                break;
+            case 'resend_confirmation':
+                resend_confirmation_email();
                 break;
             case 'save_transaction':
                 save_transaction();
@@ -77,6 +80,9 @@ function handle_post_action(): never
             case 'change_password':
                 change_password();
                 break;
+            case 'delete_account':
+                delete_account();
+                break;
             default:
                 throw new InvalidArgumentException('Unknown action.');
         }
@@ -109,6 +115,10 @@ function redirect_after_action_error(string $action): never
     if ($action === 'register') {
         redirect('register', register_invite_query());
     }
+    if ($action === 'resend_confirmation') {
+        $from = is_string($_POST['from'] ?? null) ? $_POST['from'] : '';
+        redirect($from === 'check-email' ? 'check-email' : 'login');
+    }
     if (str_contains($action, 'invite')) {
         redirect('household');
     }
@@ -116,8 +126,9 @@ function redirect_after_action_error(string $action): never
         $action === 'update_profile'
         || $action === 'update_household'
         || $action === 'change_password'
+        || $action === 'delete_account'
     ) {
-        redirect_after_profile(true);
+        redirect_after_profile(true, $action === 'delete_account');
     }
     if (str_contains($action, 'statement')) {
         redirect('statement');
@@ -145,7 +156,7 @@ function register_household(): void
         'email' => normalize_login_email($email),
         'household_name' => trim($householdName),
     ]);
-    $userId = create_household_owner(
+    $created = create_household_owner(
         $displayName,
         $email,
         (string) ($_POST['password'] ?? ''),
@@ -153,15 +164,35 @@ function register_household(): void
         $householdName,
         $invite
     );
-    establish_user_session($userId);
+    unset($_SESSION['old_form']);
     if ($invite !== '') {
+        establish_user_session((int) $created['id']);
         $joined = current_user();
         $householdLabel = is_array($joined) ? (string) ($joined['household_name'] ?? 'this household') : 'this household';
         flash('success', 'You have joined ' . $householdLabel . '. HomeLedger will only show this household\'s data.');
-    } else {
-        flash('success', 'Your household is ready. HomeLedger will only show this household\'s data.');
+        redirect('dashboard');
     }
-    redirect('dashboard');
+
+    $confirmToken = is_string($created['confirm_token'] ?? null) ? $created['confirm_token'] : '';
+    $confirmExpires = $created['confirm_expires'] ?? null;
+    if ($confirmToken === '' || !$confirmExpires instanceof DateTimeImmutable) {
+        throw new RuntimeException('The confirmation email could not be prepared.');
+    }
+    publish_email_confirm_link((string) $created['login'], $confirmToken, $confirmExpires);
+    flash_after_email_confirm_send(false);
+    redirect('check-email');
+}
+
+function resend_confirmation_email(): void
+{
+    $email = (string) ($_POST['email'] ?? '');
+    if ($email === '') {
+        $email = pending_email_confirm_login();
+    }
+    remember_form(['email' => normalize_login_email($email)]);
+    resend_email_confirmation($email);
+    flash_after_email_confirm_send(true);
+    redirect('check-email');
 }
 
 function flash_after_invite(bool $resent): void
@@ -228,11 +259,15 @@ function profile_return_page(): string
     return safe_next_page(is_string($_POST['return_page'] ?? null) ? $_POST['return_page'] : null);
 }
 
-function redirect_after_profile(bool $reopen = false): never
+function redirect_after_profile(bool $reopen = false, bool $reopenDelete = false): never
 {
     $query = [];
     if ($reopen && (string) ($_POST['from_profile'] ?? '') === '1') {
         $query['profile'] = '1';
+    }
+    if ($reopenDelete) {
+        $query['delete'] = '1';
+        unset($query['profile']);
     }
     redirect(profile_return_page(), $query);
 }
@@ -266,6 +301,26 @@ function change_password(): void
     );
     flash('success', 'Your password was updated.');
     redirect_after_profile();
+}
+
+function delete_account(): void
+{
+    $transferRaw = $_POST['transfer_user_id'] ?? null;
+    $transferUserId = null;
+    if (is_string($transferRaw) && ctype_digit($transferRaw)) {
+        $transferUserId = (int) $transferRaw;
+    } elseif (is_int($transferRaw)) {
+        $transferUserId = $transferRaw;
+    }
+
+    delete_current_user_account(
+        (string) ($_POST['current_password'] ?? ''),
+        (string) ($_POST['confirm_household_id'] ?? ''),
+        $transferUserId
+    );
+    destroy_user_session();
+    flash('success', 'Your HomeLedger account was deleted.');
+    redirect('login');
 }
 
 function save_transaction(): void

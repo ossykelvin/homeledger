@@ -96,7 +96,7 @@ $canManageInvites = $currentUserId > 0 && $currentUserId === $ownerId;
                 </table>
             </div>
         </div>
-        <p class="range-note">Everyone here has the same access to this ledger except invites, which only the owner can send. Owner is the earliest account. Membership cannot be moved to another household from this page.</p>
+        <p class="range-note">Everyone here has the same access to this ledger except invites, which only the owner can send. Ownership is stored on the household and can be transferred if the owner deletes their account. Membership cannot be moved to another household from this page.</p>
     </div>
 
     <div class="household-section">

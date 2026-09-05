@@ -146,6 +146,24 @@ button { color: inherit; }
 [data-theme="light"] .theme-icon.moon { display: none; }
 .primary-button, .secondary-button, .text-button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 43px; padding: 10px 17px; border-radius: 999px; cursor: pointer; font-weight: 750; font-size: .83rem; transition: .18s ease; }
 .primary-button { border: 1px solid var(--lime); background: var(--lime); color: #080b0f; }
+.primary-button:disabled, .danger-button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.danger-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 43px;
+  padding: 10px 17px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 750;
+  font-size: .83rem;
+  transition: .18s ease;
+  border: 1px solid var(--danger);
+  background: var(--danger);
+  color: #080b0f;
+}
+.danger-button:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 88%, white); transform: translateY(-1px); }
 .primary-button:hover { background: color-mix(in srgb, var(--lime) 88%, white); transform: translateY(-1px); }
 .primary-button svg, .secondary-button svg { width: 17px; height: 17px; }
 .secondary-button { border: 1px solid var(--line-strong); background: transparent; color: var(--text); }
@@ -418,6 +436,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--lime); outline: 
 .auth-form label > span { color: var(--muted); font-size: .72rem; font-weight: 700; }
 .auth-form input { min-width: 0; width: 100%; }
 .auth-form .primary-button { width: 100%; }
+.auth-form .secondary-button { width: 100%; }
+.auth-card .invite-link-card { margin: 22px 0 0; }
 .export-bar { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 18px; }
 .export-bar .secondary-button { min-height: 40px; }
 .auth-switch { margin: 18px 0 0; text-align: center; font-size: .88rem; }
@@ -516,6 +536,32 @@ input:focus, select:focus, textarea:focus { border-color: var(--lime); outline: 
   font-weight: 700;
 }
 .settings-form .primary-button { justify-self: start; min-height: 42px; }
+.danger-card { border-color: color-mix(in srgb, var(--danger) 42%, var(--line)); }
+.danger-card > p { margin: 0; color: var(--muted); font-size: .88rem; }
+.danger-card .danger-button { justify-self: start; min-height: 42px; }
+.delete-account-dialog .settings-stack { padding: 0 0 8px; }
+.delete-account-dialog .settings-card { margin: 0 22px 22px; }
+.delete-account-dialog .dialog-actions { margin-top: 8px; padding-top: 16px; }
+.owner-transfer { margin: 0; padding: 0; border: 0; min-width: 0; }
+.owner-transfer legend { margin-bottom: 8px; color: var(--muted); font-size: .72rem; font-weight: 700; }
+.owner-transfer-list { display: grid; gap: 8px; }
+.owner-transfer-list label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  cursor: pointer;
+}
+.owner-transfer-list label:has(input:checked) {
+  border-color: var(--lime);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lime) 18%, transparent);
+}
+.owner-transfer-list input { width: auto; min-height: 18px; flex: 0 0 auto; }
+.owner-transfer-list span { display: grid; gap: 2px; min-width: 0; }
+.owner-transfer-list small { color: var(--muted); font-weight: 500; overflow-wrap: anywhere; }
 .settings-readonly { margin: 0; display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .settings-readonly dt { color: var(--muted); font-size: .72rem; font-weight: 700; }
 .settings-readonly dd { margin: 0; color: var(--text); font-weight: 700; overflow-wrap: anywhere; }

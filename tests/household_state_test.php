@@ -53,9 +53,12 @@ try {
     $memberId = household_state_insert_user($pdo, $householdA, $memberEmail, 'Member A');
     $otherOwnerId = household_state_insert_user($pdo, $householdB, 'hl-state-b-' . $stamp . '@example.test', 'Owner B');
     $userIds = [$ownerId, $memberId, $otherOwnerId];
+    $setOwner = $pdo->prepare('UPDATE households SET owner_user_id = ? WHERE id = ?');
+    $setOwner->execute([$ownerId, $householdA]);
+    $setOwner->execute([$otherOwnerId, $householdB]);
 
     household_state_assert($householdA !== 1 && $householdB !== 1, 'Throwaway households must not reuse household 1.');
-    household_state_assert(household_owner_user_id($householdA) === $ownerId, 'Earliest user should be the household owner.');
+    household_state_assert(household_owner_user_id($householdA) === $ownerId, 'Stored owner_user_id should be the household owner.');
     household_state_assert(household_state_version($householdA) === 1, 'New household state version should start at 1.');
     household_state_assert(household_state_version($householdB) === 1, 'Second household should have its own starting version.');
 

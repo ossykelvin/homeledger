@@ -119,6 +119,23 @@ function valid_household_public_code(string $code): bool
     );
 }
 
+function household_public_code_key(string $code): string
+{
+    $stripped = preg_replace('/[\s\-]+/', '', $code);
+
+    return strtoupper(is_string($stripped) ? $stripped : '');
+}
+
+function household_public_codes_equal(string $expected, string $typed): bool
+{
+    $left = household_public_code_key($expected);
+    $right = household_public_code_key($typed);
+
+    return $left !== ''
+        && strlen($left) === HOUSEHOLD_PUBLIC_CODE_LENGTH
+        && hash_equals($left, $right);
+}
+
 function is_household_public_code_collision(PDOException $exception): bool
 {
     $sqlState = (string) $exception->getCode();

@@ -43,6 +43,8 @@ require_once $basePath . '/app/helpers.php';
 require_once $basePath . '/app/Auth.php';
 require_once $basePath . '/app/Mailer.php';
 require_once $basePath . '/app/Invites.php';
+require_once $basePath . '/app/EmailConfirm.php';
+require_once $basePath . '/app/AccountDelete.php';
 require_once $basePath . '/app/StatementExport.php';
 
 $config = [
