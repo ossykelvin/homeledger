@@ -1,8 +1,8 @@
-CREATE DATABASE IF NOT EXISTS homeledger
+CREATE DATABASE IF NOT EXISTS koptryzt_homeledger
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
 
-USE homeledger;
+USE koptryzt_homeledger;
 
 CREATE TABLE IF NOT EXISTS households (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

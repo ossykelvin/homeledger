@@ -9,9 +9,9 @@ $summaryStmt = db()->prepare(
         COALESCE(SUM(CASE WHEN type = \'income\' THEN amount ELSE 0 END), 0) AS income,
         COALESCE(SUM(CASE WHEN type = \'expense\' THEN amount ELSE 0 END), 0) AS expense,
         COUNT(*) AS entry_count
-     FROM transactions WHERE transaction_date BETWEEN ? AND ?'
+     FROM transactions WHERE household_id = ? AND transaction_date BETWEEN ? AND ?'
 );
-$summaryStmt->execute([$monthStart, $monthEnd]);
+$summaryStmt->execute([current_household_id(), $monthStart, $monthEnd]);
 $summary = $summaryStmt->fetch();
 $income = (float) $summary['income'];
 $expense = (float) $summary['expense'];
@@ -20,20 +20,20 @@ $savingRate = $income > 0 ? (($income - $expense) / $income) * 100 : 0;
 
 $recentStmt = db()->prepare(
     'SELECT t.*, c.name AS category_name, c.colour AS category_colour
-     FROM transactions t JOIN categories c ON c.id = t.category_id
-     WHERE t.transaction_date BETWEEN ? AND ?
+     FROM transactions t JOIN categories c ON c.id = t.category_id AND c.household_id = t.household_id
+     WHERE t.household_id = ? AND t.transaction_date BETWEEN ? AND ?
      ORDER BY t.transaction_date DESC, t.id DESC LIMIT 6'
 );
-$recentStmt->execute([$monthStart, $monthEnd]);
+$recentStmt->execute([current_household_id(), $monthStart, $monthEnd]);
 $recent = $recentStmt->fetchAll();
 
 $categoryStmt = db()->prepare(
     'SELECT c.name, c.colour, SUM(t.amount) AS total
-     FROM transactions t JOIN categories c ON c.id = t.category_id
-     WHERE t.type = \'expense\' AND t.transaction_date BETWEEN ? AND ?
+     FROM transactions t JOIN categories c ON c.id = t.category_id AND c.household_id = t.household_id
+     WHERE t.household_id = ? AND t.type = \'expense\' AND t.transaction_date BETWEEN ? AND ?
      GROUP BY c.id, c.name, c.colour ORDER BY total DESC LIMIT 5'
 );
-$categoryStmt->execute([$monthStart, $monthEnd]);
+$categoryStmt->execute([current_household_id(), $monthStart, $monthEnd]);
 $spendingCategories = $categoryStmt->fetchAll();
 
 $chartStart = (new DateTimeImmutable($monthStart))->modify('-5 months')->format('Y-m-01');
@@ -41,10 +41,10 @@ $chartStmt = db()->prepare(
     'SELECT DATE_FORMAT(transaction_date, \'%Y-%m\') AS month_key,
         SUM(CASE WHEN type = \'income\' THEN amount ELSE 0 END) AS income,
         SUM(CASE WHEN type = \'expense\' THEN amount ELSE 0 END) AS expense
-     FROM transactions WHERE transaction_date BETWEEN ? AND ?
+     FROM transactions WHERE household_id = ? AND transaction_date BETWEEN ? AND ?
      GROUP BY month_key ORDER BY month_key'
 );
-$chartStmt->execute([$chartStart, $monthEnd]);
+$chartStmt->execute([current_household_id(), $chartStart, $monthEnd]);
 $chartRows = [];
 foreach ($chartStmt->fetchAll() as $row) {
     $chartRows[$row['month_key']] = $row;
@@ -63,12 +63,14 @@ for ($i = 5; $i >= 0; $i--) {
     $chartData[] = $item;
 }
 
-$upcoming = db()->query(
+$upcomingStmt = db()->prepare(
     'SELECT r.*, c.name AS category_name, c.colour AS category_colour
-     FROM recurring_entries r JOIN categories c ON c.id = r.category_id
-     WHERE r.active = 1 AND (r.end_date IS NULL OR r.next_due_date <= r.end_date)
+     FROM recurring_entries r JOIN categories c ON c.id = r.category_id AND c.household_id = r.household_id
+     WHERE r.household_id = ? AND r.active = 1 AND (r.end_date IS NULL OR r.next_due_date <= r.end_date)
      ORDER BY r.next_due_date, r.id LIMIT 4'
-)->fetchAll();
+);
+$upcomingStmt->execute([current_household_id()]);
+$upcoming = $upcomingStmt->fetchAll();
 ?>
 
 <section class="dashboard-section">

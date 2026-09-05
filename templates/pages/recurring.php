@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
-$stmt = db()->query(
+$stmt = db()->prepare(
     'SELECT r.*, c.name AS category_name, c.colour AS category_colour
-     FROM recurring_entries r JOIN categories c ON c.id = r.category_id
+     FROM recurring_entries r JOIN categories c ON c.id = r.category_id AND c.household_id = r.household_id
+     WHERE r.household_id = ?
      ORDER BY r.active DESC, r.next_due_date, r.id'
 );
+$stmt->execute([current_household_id()]);
 $recurringEntries = $stmt->fetchAll();
 $monthlyIncome = 0.0;
 $monthlyExpense = 0.0;

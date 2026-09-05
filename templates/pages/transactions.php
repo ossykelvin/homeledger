@@ -6,8 +6,8 @@ declare(strict_types=1);
 $typeFilter = in_array($_GET['type'] ?? '', ['income', 'expense'], true) ? (string) $_GET['type'] : '';
 $search = trim((string) ($_GET['search'] ?? ''));
 
-$where = ['t.transaction_date BETWEEN ? AND ?'];
-$params = [$monthStart, $monthEnd];
+$where = ['t.household_id = ?', 'c.household_id = ?', 't.transaction_date BETWEEN ? AND ?'];
+$params = [current_household_id(), current_household_id(), $monthStart, $monthEnd];
 if ($typeFilter !== '') {
     $where[] = 't.type = ?';
     $params[] = $typeFilter;
@@ -20,7 +20,7 @@ if ($search !== '') {
 
 $stmt = db()->prepare(
     'SELECT t.*, c.name AS category_name, c.colour AS category_colour
-     FROM transactions t JOIN categories c ON c.id = t.category_id
+     FROM transactions t JOIN categories c ON c.id = t.category_id AND c.household_id = t.household_id
      WHERE ' . implode(' AND ', $where) . '
      ORDER BY t.transaction_date DESC, t.id DESC LIMIT 250'
 );

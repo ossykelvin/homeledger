@@ -1,9 +1,16 @@
-const CACHE_NAME = 'homeledger-shell-v1';
+const CACHE_NAME = 'homeledger-shell-v16';
 const STATIC_ASSETS = [
   './assets/app.css',
   './assets/app.js',
-  './assets/icons/icon.svg',
   './assets/icons/sprite.svg',
+  './assets/brand/logo-dark.png',
+  './assets/brand/logo-light.png',
+  './assets/brand/favicon.ico',
+  './assets/brand/favicon-16.png',
+  './assets/brand/favicon-32.png',
+  './assets/brand/apple-touch-icon.png',
+  './assets/brand/icon-192.png',
+  './assets/brand/icon-512.png',
   './manifest.webmanifest'
 ];
 
@@ -21,6 +28,12 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || event.request.mode === 'navigate') return;
+  try {
+    const url = new URL(event.request.url);
+    if (url.searchParams.get('page') === 'household_sync') return;
+  } catch (error) {
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
       const copy = response.clone();

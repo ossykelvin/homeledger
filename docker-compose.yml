@@ -4,15 +4,24 @@ services:
     ports:
       - "8080:80"
     environment:
-      APP_NAME: HomeLedger
-      APP_CURRENCY: GBP
-      APP_CURRENCY_SYMBOL: £
-      APP_TIMEZONE: Europe/London
+      APP_NAME: ${APP_NAME:-HomeLedger}
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      APP_CURRENCY: ${APP_CURRENCY:-GBP}
+      APP_CURRENCY_SYMBOL: ${APP_CURRENCY_SYMBOL:-£}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Europe/London}
       DB_HOST: db
       DB_PORT: 3306
       DB_DATABASE: homeledger
       DB_USERNAME: homeledger
       DB_PASSWORD: change-this-password
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-HomeLedger}
+      MAIL_ENCRYPTION: ${MAIL_ENCRYPTION:-tls}
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
     volumes:
       - .:/var/www/html
     depends_on:
@@ -21,6 +30,8 @@ services:
 
   db:
     image: mysql:8.4
+    ports:
+      - "3306:3306"
     environment:
       MYSQL_DATABASE: homeledger
       MYSQL_USER: homeledger
@@ -34,6 +45,19 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+
+  phpmyadmin:
+    image: phpmyadmin:5
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_USER: homeledger
+      PMA_PASSWORD: change-this-password
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   homeledger_mysql:

@@ -10,7 +10,7 @@ try {
         throw new InvalidArgumentException('Use a date in YYYY-MM-DD format.');
     }
     $created = materialise_due_recurring_entries($throughDate);
-    fwrite(STDOUT, "Created {$created} due transaction(s) through {$throughDate}.\n");
+    fwrite(STDOUT, "Created {$created} due transaction(s) through {$throughDate} across all households.\n");
     exit(0);
 } catch (Throwable $exception) {
     fwrite(STDERR, $exception->getMessage() . "\n");

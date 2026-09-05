@@ -7,6 +7,10 @@
     root.dataset.theme = theme;
     localStorage.setItem('homeledger-theme', theme);
     themeMeta?.setAttribute('content', theme === 'light' ? '#f1f0eb' : '#080b0f');
+    const logo = document.getElementById('brand-logo-img');
+    if (logo) {
+      logo.setAttribute('src', theme === 'light' ? 'assets/brand/logo-light.png' : 'assets/brand/logo-dark.png');
+    }
   };
 
   themeButton?.addEventListener('click', () => setTheme(root.dataset.theme === 'dark' ? 'light' : 'dark'));
@@ -30,18 +34,31 @@
     if (reset) dialog.querySelector('form')?.reset();
     document.body.classList.add('dialog-open');
     dialog.showModal();
-    requestAnimationFrame(() => dialog.querySelector('input:not([type="hidden"]), select, button')?.focus());
+    const profileButton = document.querySelector('.profile-toggle');
+    if (dialog.id === 'profile-dialog') {
+      profileButton?.setAttribute('aria-expanded', 'true');
+      requestAnimationFrame(() => dialog.querySelector('[name="display_name"]')?.focus());
+      return;
+    }
+    requestAnimationFrame(() => dialog.querySelector('input:not([type="hidden"]):not([readonly]), select, button')?.focus());
   };
 
   const closeDialog = (dialog) => {
     if (!dialog?.open) return;
     dialog.close();
     document.body.classList.remove('dialog-open');
+    if (dialog.id === 'profile-dialog') {
+      document.querySelector('.profile-toggle')?.setAttribute('aria-expanded', 'false');
+    }
   };
 
   document.querySelectorAll('[data-open-dialog]').forEach((button) => {
     button.addEventListener('click', () => {
       const dialog = document.getElementById(button.dataset.openDialog);
+      if (dialog?.id === 'profile-dialog') {
+        openDialog(dialog, false);
+        return;
+      }
       if (dialog?.id === 'transaction-dialog') {
         const title = dialog.querySelector('#transaction-dialog-title');
         if (title) title.textContent = 'Add transaction';
@@ -65,7 +82,12 @@
       const rect = dialog.getBoundingClientRect();
       if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) closeDialog(dialog);
     });
-    dialog.addEventListener('close', () => document.body.classList.remove('dialog-open'));
+    dialog.addEventListener('close', () => {
+      document.body.classList.remove('dialog-open');
+      if (dialog.id === 'profile-dialog') {
+        document.querySelector('.profile-toggle')?.setAttribute('aria-expanded', 'false');
+      }
+    });
   });
 
   const filterCategoryOptions = (form) => {
@@ -129,7 +151,54 @@
   toast?.querySelector('button')?.addEventListener('click', () => toast.remove());
   if (toast) window.setTimeout(() => toast.remove(), 5000);
 
+  if (new URLSearchParams(window.location.search).get('profile') === '1') {
+    openDialog(document.getElementById('profile-dialog'), false);
+  }
+
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));
+  }
+
+  const householdVersion = document.body?.dataset.householdVersion;
+  if (householdVersion) {
+    const pollMs = 6000;
+    let seenVersion = householdVersion;
+    let inFlight = false;
+    let reloading = false;
+
+    const pollHousehold = () => {
+      if (reloading || inFlight || document.hidden) return;
+      inFlight = true;
+      fetch('?page=household_sync', {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+      })
+        .then((response) => {
+          if (response.status === 401) {
+            reloading = true;
+            return null;
+          }
+          return response.ok ? response.json() : null;
+        })
+        .then((payload) => {
+          if (!payload || payload.version == null) return;
+          const nextVersion = String(payload.version);
+          if (nextVersion !== seenVersion) {
+            reloading = true;
+            seenVersion = nextVersion;
+            window.location.reload();
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          inFlight = false;
+        });
+    };
+
+    window.setInterval(pollHousehold, pollMs);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) pollHousehold();
+    });
   }
 })();

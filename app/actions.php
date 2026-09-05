@@ -6,9 +6,38 @@ function handle_post_action(): never
 {
     verify_csrf();
     $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
+    $publicActions = ['login', 'setup', 'register', 'logout'];
+
+    if ($action === 'logout') {
+        destroy_user_session();
+        flash('success', 'You have signed out.');
+        redirect('login');
+    }
+
+    if (!in_array($action, $publicActions, true) && !is_authenticated()) {
+        flash('error', 'Please sign in to continue.');
+        redirect('login');
+    }
+
+    if ($action === 'setup') {
+        $action = 'register';
+    }
+    if ($action === 'login' && is_authenticated()) {
+        redirect('dashboard');
+    }
+    if ($action === 'register' && is_authenticated()) {
+        redirect('dashboard');
+    }
 
     try {
         switch ($action) {
+            case 'login':
+                login_user();
+                break;
+            case 'setup':
+            case 'register':
+                register_household();
+                break;
             case 'save_transaction':
                 save_transaction();
                 break;
@@ -24,18 +53,219 @@ function handle_post_action(): never
             case 'delete_recurring':
                 delete_recurring_entry();
                 break;
+            case 'export_statement_pdf':
+                export_statement('pdf');
+                break;
+            case 'export_statement_excel':
+                export_statement('excel');
+                break;
+            case 'send_invite':
+                send_invite();
+                break;
+            case 'revoke_invite':
+                revoke_invite();
+                break;
+            case 'resend_invite':
+                resend_invite();
+                break;
+            case 'update_profile':
+                update_profile();
+                break;
+            case 'update_household':
+                update_household_settings();
+                break;
+            case 'change_password':
+                change_password();
+                break;
             default:
                 throw new InvalidArgumentException('Unknown action.');
         }
         throw new LogicException('The requested action did not complete.');
     } catch (InvalidArgumentException $exception) {
         flash('error', $exception->getMessage());
-        redirect($action === 'save_recurring' ? 'recurring' : 'transactions');
+        redirect_after_action_error($action);
     } catch (Throwable $exception) {
         error_log($exception->getMessage());
         flash('error', 'The change could not be saved. Please check your details and try again.');
-        redirect(str_contains($action, 'recurring') ? 'recurring' : 'transactions');
+        redirect_after_action_error($action);
     }
+}
+
+function register_invite_query(): array
+{
+    $invite = $_POST['invite'] ?? '';
+    if (!is_string($invite) || trim($invite) === '') {
+        return [];
+    }
+
+    return ['invite' => trim($invite)];
+}
+
+function redirect_after_action_error(string $action): never
+{
+    if ($action === 'login') {
+        redirect('login', ['next' => safe_next_page(is_string($_POST['next'] ?? null) ? $_POST['next'] : null)]);
+    }
+    if ($action === 'register') {
+        redirect('register', register_invite_query());
+    }
+    if (str_contains($action, 'invite')) {
+        redirect('household');
+    }
+    if (
+        $action === 'update_profile'
+        || $action === 'update_household'
+        || $action === 'change_password'
+    ) {
+        redirect_after_profile(true);
+    }
+    if (str_contains($action, 'statement')) {
+        redirect('statement');
+    }
+    redirect(str_contains($action, 'recurring') ? 'recurring' : 'transactions');
+}
+
+function login_user(): void
+{
+    $email = (string) ($_POST['email'] ?? '');
+    $password = (string) ($_POST['password'] ?? '');
+    remember_form(['email' => normalize_login_email($email)]);
+    authenticate_with_password($email, $password);
+    redirect(safe_next_page(is_string($_POST['next'] ?? null) ? $_POST['next'] : null));
+}
+
+function register_household(): void
+{
+    $displayName = (string) ($_POST['display_name'] ?? '');
+    $email = (string) ($_POST['email'] ?? '');
+    $householdName = (string) ($_POST['household_name'] ?? '');
+    $invite = is_string($_POST['invite'] ?? null) ? trim((string) $_POST['invite']) : '';
+    remember_form([
+        'display_name' => trim($displayName),
+        'email' => normalize_login_email($email),
+        'household_name' => trim($householdName),
+    ]);
+    $userId = create_household_owner(
+        $displayName,
+        $email,
+        (string) ($_POST['password'] ?? ''),
+        (string) ($_POST['password_confirm'] ?? ''),
+        $householdName,
+        $invite
+    );
+    establish_user_session($userId);
+    if ($invite !== '') {
+        $joined = current_user();
+        $householdLabel = is_array($joined) ? (string) ($joined['household_name'] ?? 'this household') : 'this household';
+        flash('success', 'You have joined ' . $householdLabel . '. HomeLedger will only show this household\'s data.');
+    } else {
+        flash('success', 'Your household is ready. HomeLedger will only show this household\'s data.');
+    }
+    redirect('dashboard');
+}
+
+function flash_after_invite(bool $resent): void
+{
+    $status = pull_invite_mail_status();
+    if ($status === 'sent') {
+        flash(
+            'success',
+            $resent
+                ? 'Invite email sent. The previous link no longer works. Copy the new link below as a backup.'
+                : 'Invite email sent. Copy the link below as a backup.'
+        );
+
+        return;
+    }
+    if ($status === 'failed') {
+        $reason = pull_invite_mail_error();
+        $reasonSuffix = $reason !== '' ? ' ' . $reason : '';
+        flash(
+            'error',
+            $resent
+                ? 'Invite resent but email failed to send.' . $reasonSuffix . ' Copy the new link below. The previous link no longer works.'
+                : 'Invite created but email failed to send.' . $reasonSuffix . ' Copy the link below.'
+        );
+
+        return;
+    }
+
+    flash(
+        'error',
+        $resent
+            ? 'Invite resent. Email is not configured. Copy the new link below. The previous link no longer works.'
+            : 'Invite created. Email is not configured. Copy the link below.'
+    );
+}
+
+function send_invite(): void
+{
+    $email = (string) ($_POST['email'] ?? '');
+    remember_form(['invite_email' => normalize_login_email($email)]);
+    create_household_invite($email);
+    flash_after_invite(false);
+    redirect('household');
+}
+
+function resend_invite(): void
+{
+    $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT) ?: 0;
+    resend_household_invite((int) $id);
+    flash_after_invite(true);
+    redirect('household');
+}
+
+function revoke_invite(): void
+{
+    $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT) ?: 0;
+    revoke_household_invite((int) $id);
+    flash('success', 'That invite was cancelled.');
+    redirect('household');
+}
+
+function profile_return_page(): string
+{
+    return safe_next_page(is_string($_POST['return_page'] ?? null) ? $_POST['return_page'] : null);
+}
+
+function redirect_after_profile(bool $reopen = false): never
+{
+    $query = [];
+    if ($reopen && (string) ($_POST['from_profile'] ?? '') === '1') {
+        $query['profile'] = '1';
+    }
+    redirect(profile_return_page(), $query);
+}
+
+function update_profile(): void
+{
+    $displayName = (string) ($_POST['display_name'] ?? '');
+    remember_form(['display_name' => trim($displayName)]);
+    update_current_display_name($displayName);
+    unset($_SESSION['old_form']);
+    flash('success', 'Your display name was updated.');
+    redirect_after_profile();
+}
+
+function update_household_settings(): void
+{
+    $householdName = (string) ($_POST['household_name'] ?? '');
+    remember_form(['household_name' => trim($householdName)]);
+    update_current_household_name($householdName);
+    unset($_SESSION['old_form']);
+    flash('success', 'The household name was updated.');
+    redirect_after_profile();
+}
+
+function change_password(): void
+{
+    change_current_user_password(
+        (string) ($_POST['current_password'] ?? ''),
+        (string) ($_POST['password'] ?? ''),
+        (string) ($_POST['password_confirm'] ?? '')
+    );
+    flash('success', 'Your password was updated.');
+    redirect_after_profile();
 }
 
 function save_transaction(): void
@@ -48,22 +278,26 @@ function save_transaction(): void
     $date = (string) ($_POST['transaction_date'] ?? '');
     $notes = trim((string) ($_POST['notes'] ?? ''));
 
+    $householdId = current_household_id();
     validate_entry_fields($type, $description, $amount, $categoryId, $date, $notes);
 
     if ($id) {
+        if (!household_owns_transaction($id)) {
+            throw new InvalidArgumentException('Transaction not found.');
+        }
         $stmt = db()->prepare(
             'UPDATE transactions
              SET type = ?, description = ?, amount = ?, category_id = ?, transaction_date = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
-             WHERE id = ?'
+             WHERE id = ? AND household_id = ?'
         );
-        $stmt->execute([$type, $description, $amount, $categoryId, $date, $notes ?: null, $id]);
+        $stmt->execute([$type, $description, $amount, $categoryId, $date, $notes ?: null, $id, $householdId]);
         flash('success', 'Transaction updated.');
     } else {
         $stmt = db()->prepare(
-            'INSERT INTO transactions (type, description, amount, category_id, transaction_date, notes, source)
-             VALUES (?, ?, ?, ?, ?, ?, \'manual\')'
+            'INSERT INTO transactions (household_id, type, description, amount, category_id, transaction_date, notes, source)
+             VALUES (?, ?, ?, ?, ?, ?, ?, \'manual\')'
         );
-        $stmt->execute([$type, $description, $amount, $categoryId, $date, $notes ?: null]);
+        $stmt->execute([$householdId, $type, $description, $amount, $categoryId, $date, $notes ?: null]);
         flash('success', 'Transaction added.');
     }
 
@@ -73,12 +307,15 @@ function save_transaction(): void
 function delete_transaction(): void
 {
     $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
-    if (!$id) {
+    if (!$id || !household_owns_transaction($id)) {
         throw new InvalidArgumentException('Transaction not found.');
     }
 
-    $stmt = db()->prepare('DELETE FROM transactions WHERE id = ?');
-    $stmt->execute([$id]);
+    $stmt = db()->prepare('DELETE FROM transactions WHERE id = ? AND household_id = ?');
+    $stmt->execute([$id, current_household_id()]);
+    if ($stmt->rowCount() === 0) {
+        throw new InvalidArgumentException('Transaction not found.');
+    }
     flash('success', 'Transaction deleted.');
     redirect('transactions');
 }
@@ -96,6 +333,7 @@ function save_recurring_entry(): void
     $interval = filter_input(INPUT_POST, 'interval_count', FILTER_VALIDATE_INT) ?: 1;
     $notes = trim((string) ($_POST['notes'] ?? ''));
 
+    $householdId = current_household_id();
     validate_entry_fields($type, $description, $amount, $categoryId, $startDate, $notes);
     if (!in_array($frequency, ['daily', 'weekly', 'monthly', 'yearly'], true)) {
         throw new InvalidArgumentException('Choose a valid repeat frequency.');
@@ -108,8 +346,11 @@ function save_recurring_entry(): void
     }
 
     if ($id) {
-        $existing = db()->prepare('SELECT next_due_date FROM recurring_entries WHERE id = ?');
-        $existing->execute([$id]);
+        if (!household_owns_recurring($id)) {
+            throw new InvalidArgumentException('Recurring entry not found.');
+        }
+        $existing = db()->prepare('SELECT next_due_date FROM recurring_entries WHERE id = ? AND household_id = ?');
+        $existing->execute([$id, $householdId]);
         $nextDue = $existing->fetchColumn();
         if (!$nextDue) {
             throw new InvalidArgumentException('Recurring entry not found.');
@@ -120,39 +361,39 @@ function save_recurring_entry(): void
             'UPDATE recurring_entries
              SET type = ?, description = ?, amount = ?, category_id = ?, frequency = ?, interval_count = ?,
                  start_date = ?, next_due_date = ?, end_date = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
-             WHERE id = ?'
+             WHERE id = ? AND household_id = ?'
         );
         $stmt->execute([
             $type, $description, $amount, $categoryId, $frequency, $interval,
-            $startDate, $nextDue, $endDate ?: null, $notes ?: null, $id,
+            $startDate, $nextDue, $endDate ?: null, $notes ?: null, $id, $householdId,
         ]);
         flash('success', 'Recurring entry updated. Future transactions will use the new details.');
     } else {
         $stmt = db()->prepare(
             'INSERT INTO recurring_entries
-             (type, description, amount, category_id, frequency, interval_count, start_date, next_due_date, end_date, notes)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+             (household_id, type, description, amount, category_id, frequency, interval_count, start_date, next_due_date, end_date, notes)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
-            $type, $description, $amount, $categoryId, $frequency, $interval,
+            $householdId, $type, $description, $amount, $categoryId, $frequency, $interval,
             $startDate, $startDate, $endDate ?: null, $notes ?: null,
         ]);
         flash('success', 'Recurring entry added.');
     }
 
-    materialise_due_recurring_entries();
+    materialise_due_recurring_entries(null, $householdId);
     redirect('recurring');
 }
 
 function toggle_recurring_entry(): void
 {
     $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
-    if (!$id) {
+    if (!$id || !household_owns_recurring($id)) {
         throw new InvalidArgumentException('Recurring entry not found.');
     }
 
-    $stmt = db()->prepare('UPDATE recurring_entries SET active = NOT active, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
-    $stmt->execute([$id]);
+    $stmt = db()->prepare('UPDATE recurring_entries SET active = NOT active, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND household_id = ?');
+    $stmt->execute([$id, current_household_id()]);
     flash('success', 'Recurring entry status changed.');
     redirect('recurring');
 }
@@ -160,12 +401,15 @@ function toggle_recurring_entry(): void
 function delete_recurring_entry(): void
 {
     $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
-    if (!$id) {
+    if (!$id || !household_owns_recurring($id)) {
         throw new InvalidArgumentException('Recurring entry not found.');
     }
 
-    $stmt = db()->prepare('DELETE FROM recurring_entries WHERE id = ?');
-    $stmt->execute([$id]);
+    $stmt = db()->prepare('DELETE FROM recurring_entries WHERE id = ? AND household_id = ?');
+    $stmt->execute([$id, current_household_id()]);
+    if ($stmt->rowCount() === 0) {
+        throw new InvalidArgumentException('Recurring entry not found.');
+    }
     flash('success', 'Recurring entry deleted. Existing transactions were kept.');
     redirect('recurring');
 }
@@ -196,4 +440,23 @@ function validate_entry_fields(
     if (text_length($notes) > 500) {
         throw new InvalidArgumentException('Notes cannot be longer than 500 characters.');
     }
+}
+
+function export_statement(string $format): never
+{
+    [$from, $to] = statement_date_range($_POST['from'] ?? null, $_POST['to'] ?? null);
+    $statement = load_statement($from, $to);
+    $basename = 'homeledger-statement-' . $from . '-' . $to;
+
+    if ($format === 'excel') {
+        header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $basename . '.xls"');
+        echo StatementExport::excel($statement);
+        exit;
+    }
+
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: attachment; filename="' . $basename . '.pdf"');
+    echo StatementExport::pdf($statement);
+    exit;
 }
