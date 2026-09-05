@@ -4,6 +4,26 @@ declare(strict_types=1);
 
 $basePath = dirname(__DIR__);
 
+function env_get(string $name): string|false
+{
+    if (function_exists('getenv')) {
+        $value = getenv($name);
+        if ($value !== false) {
+            return $value;
+        }
+    }
+
+    if (array_key_exists($name, $_ENV) && is_scalar($_ENV[$name])) {
+        return (string) $_ENV[$name];
+    }
+
+    if (array_key_exists($name, $_SERVER) && is_scalar($_SERVER[$name])) {
+        return (string) $_SERVER[$name];
+    }
+
+    return false;
+}
+
 $envFile = $basePath . '/.env';
 if (is_readable($envFile)) {
     $lines = file($envFile, FILE_IGNORE_NEW_LINES);
@@ -26,11 +46,16 @@ if (is_readable($envFile)) {
             ) {
                 $value = substr($value, 1, -1);
             }
-            if ($name === '' || getenv($name) !== false) {
+            if ($name === '' || env_get($name) !== false) {
                 continue;
             }
 
-            putenv($name . '=' . $value);
+            if (function_exists('putenv')) {
+                putenv($name . '=' . $value);
+            }
+            if (function_exists('apache_setenv')) {
+                apache_setenv($name, $value);
+            }
             $_ENV[$name] = $value;
             $_SERVER[$name] = $value;
         }
@@ -49,31 +74,31 @@ require_once $basePath . '/app/StatementExport.php';
 
 $config = [
     'app' => [
-        'name' => getenv('APP_NAME') ?: 'HomeLedger',
-        'url' => getenv('APP_URL') ?: '',
-        'currency' => getenv('APP_CURRENCY') ?: 'GBP',
-        'currency_symbol' => getenv('APP_CURRENCY_SYMBOL') ?: '£',
-        'timezone' => getenv('APP_TIMEZONE') ?: 'Europe/London',
+        'name' => env_get('APP_NAME') ?: 'HomeLedger',
+        'url' => env_get('APP_URL') ?: '',
+        'currency' => env_get('APP_CURRENCY') ?: 'GBP',
+        'currency_symbol' => env_get('APP_CURRENCY_SYMBOL') ?: '£',
+        'timezone' => env_get('APP_TIMEZONE') ?: 'Europe/London',
     ],
     'database' => [
-        'host' => getenv('DB_HOST') ?: '127.0.0.1',
-        'port' => getenv('DB_PORT') ?: '3306',
-        'database' => getenv('DB_DATABASE') ?: 'homeledger',
-        'username' => getenv('DB_USERNAME') ?: 'homeledger',
-        'password' => getenv('DB_PASSWORD') ?: 'homeledger',
+        'host' => env_get('DB_HOST') ?: '127.0.0.1',
+        'port' => env_get('DB_PORT') ?: '3306',
+        'database' => env_get('DB_DATABASE') ?: 'homeledger',
+        'username' => env_get('DB_USERNAME') ?: 'homeledger',
+        'password' => env_get('DB_PASSWORD') ?: 'homeledger',
         'charset' => 'utf8mb4',
     ],
     'mail' => [
-        'host' => getenv('MAIL_HOST') ?: '',
-        'port' => getenv('MAIL_PORT') ?: '587',
-        'username' => getenv('MAIL_USERNAME') ?: '',
-        'password' => getenv('MAIL_PASSWORD') ?: '',
-        'from' => getenv('MAIL_FROM') ?: '',
-        'from_name' => getenv('MAIL_FROM_NAME') ?: 'HomeLedger',
-        'encryption' => getenv('MAIL_ENCRYPTION') ?: 'tls',
+        'host' => env_get('MAIL_HOST') ?: '',
+        'port' => env_get('MAIL_PORT') ?: '587',
+        'username' => env_get('MAIL_USERNAME') ?: '',
+        'password' => env_get('MAIL_PASSWORD') ?: '',
+        'from' => env_get('MAIL_FROM') ?: '',
+        'from_name' => env_get('MAIL_FROM_NAME') ?: 'HomeLedger',
+        'encryption' => env_get('MAIL_ENCRYPTION') ?: 'tls',
     ],
     'brevo' => [
-        'api_key' => getenv('BREVO_API_KEY') ?: '',
+        'api_key' => env_get('BREVO_API_KEY') ?: '',
     ],
 ];
 
