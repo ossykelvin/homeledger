@@ -66,10 +66,6 @@
                 </form>
             </div>
         <?php endif; ?>
-        <div class="sidebar-note">
-            <span class="status-dot"></span>
-            <p><strong>Private by default</strong><small>Your data stays in your MySQL database.</small></p>
-        </div>
     </aside>
 
     <div class="app-main">
