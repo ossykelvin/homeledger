@@ -146,8 +146,9 @@ button { color: inherit; }
 [data-theme="light"] .theme-icon.moon { display: none; }
 .primary-button, .secondary-button, .text-button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 43px; padding: 10px 17px; border-radius: 999px; cursor: pointer; font-weight: 750; font-size: .83rem; transition: .18s ease; }
 .primary-button { border: 1px solid var(--lime); background: var(--lime); color: #080b0f; }
-.primary-button:disabled, .danger-button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.primary-button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
 .danger-button {
+  appearance: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -160,6 +161,14 @@ button { color: inherit; }
   font-size: .83rem;
   transition: .18s ease;
   border: 1px solid var(--danger);
+  background: var(--danger);
+  color: #080b0f;
+}
+.danger-button:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+  transform: none;
+  border-color: var(--danger);
   background: var(--danger);
   color: #080b0f;
 }
@@ -530,11 +539,14 @@ input:focus, select:focus, textarea:focus { border-color: var(--lime); outline: 
 .settings-form label > span { color: var(--muted); font-size: .72rem; font-weight: 700; }
 .settings-form input { min-width: 0; width: 100%; }
 .settings-form input[readonly] { opacity: .88; cursor: default; }
+.household-code,
 .settings-form input.household-code {
   font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
   letter-spacing: .08em;
   font-weight: 700;
 }
+.household-id-reveal { margin: 0; color: var(--muted); font-size: .88rem; }
+.household-id-reveal .household-code { color: var(--text); }
 .settings-form .primary-button { justify-self: start; min-height: 42px; }
 .danger-card { border-color: color-mix(in srgb, var(--danger) 42%, var(--line)); }
 .danger-card > p { margin: 0; color: var(--muted); font-size: .88rem; }

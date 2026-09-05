@@ -129,6 +129,7 @@ if ($isOnlyMember) {
         </div>
         <div class="settings-card settings-form danger-card">
             <p><?= e($deleteWarning) ?></p>
+            <p class="household-id-reveal">Household ID: <strong class="household-code"><?= e($householdPublicCode) ?></strong></p>
             <label>
                 <span>Type the household ID to confirm</span>
                 <input
