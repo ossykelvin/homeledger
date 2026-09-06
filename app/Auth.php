@@ -109,10 +109,10 @@ function current_user_is_household_owner(): bool
     return (int) $user['id'] === household_owner_user_id((int) $user['household_id']);
 }
 
-function assert_household_owner(): void
+function assert_household_owner(string $message = 'Only the household owner can manage invites.'): void
 {
     if (!current_user_is_household_owner()) {
-        throw new InvalidArgumentException('Only the household owner can manage invites.');
+        throw new InvalidArgumentException($message);
     }
 }
 
@@ -146,7 +146,7 @@ function safe_next_page(?string $page): string
     if ($page === 'invite') {
         $page = 'household';
     }
-    $allowed = ['dashboard', 'transactions', 'recurring', 'statement', 'household'];
+    $allowed = ['dashboard', 'transactions', 'recurring', 'categories', 'statement', 'household'];
 
     return is_string($page) && in_array($page, $allowed, true) ? $page : 'dashboard';
 }

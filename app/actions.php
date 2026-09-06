@@ -71,6 +71,12 @@ function handle_post_action(): never
             case 'resend_invite':
                 resend_invite();
                 break;
+            case 'save_category':
+                save_category();
+                break;
+            case 'delete_category':
+                delete_category();
+                break;
             case 'update_profile':
                 update_profile();
                 break;
@@ -121,6 +127,10 @@ function redirect_after_action_error(string $action): never
     }
     if (str_contains($action, 'invite')) {
         redirect('household');
+    }
+    if (str_contains($action, 'category')) {
+        $editId = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT) ?: 0;
+        redirect('categories', $action === 'save_category' && $editId > 0 ? ['edit' => (string) $editId] : []);
     }
     if (
         $action === 'update_profile'
@@ -252,6 +262,37 @@ function revoke_invite(): void
     revoke_household_invite((int) $id);
     flash('success', 'That invite was cancelled.');
     redirect('household');
+}
+
+function save_category(): void
+{
+    $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT) ?: null;
+    $name = (string) ($_POST['name'] ?? '');
+    $type = (string) ($_POST['type'] ?? '');
+    $colour = (string) ($_POST['colour'] ?? '');
+    remember_form([
+        'category_name' => trim($name),
+        'category_type' => $type,
+        'category_colour' => $colour,
+    ]);
+    if ($id) {
+        update_household_category((int) $id, $name, $type, $colour);
+        unset($_SESSION['old_form']);
+        flash('success', 'Category updated.');
+    } else {
+        create_household_category($name, $type, $colour);
+        unset($_SESSION['old_form']);
+        flash('success', 'Category added.');
+    }
+    redirect('categories');
+}
+
+function delete_category(): void
+{
+    $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT) ?: 0;
+    delete_household_category((int) $id);
+    flash('success', 'Category deleted.');
+    redirect('categories');
 }
 
 function profile_return_page(): string

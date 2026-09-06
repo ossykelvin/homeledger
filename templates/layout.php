@@ -49,6 +49,9 @@
             <a href="?page=recurring" class="<?= $page === 'recurring' ? 'active' : '' ?>">
                 <svg aria-hidden="true"><use href="assets/icons/sprite.svg#repeat"></use></svg><span>Recurring</span>
             </a>
+            <a href="?page=categories" class="<?= $page === 'categories' ? 'active' : '' ?>">
+                <svg aria-hidden="true"><use href="assets/icons/sprite.svg#tag"></use></svg><span>Categories</span>
+            </a>
             <a href="?page=statement" class="<?= $page === 'statement' ? 'active' : '' ?>">
                 <svg aria-hidden="true"><use href="assets/icons/sprite.svg#wallet"></use></svg><span>Statement</span>
             </a>
