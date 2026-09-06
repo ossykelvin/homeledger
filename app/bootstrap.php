@@ -68,6 +68,7 @@ $appFiles = [
     'Recurrence.php',
     'helpers.php',
     'Auth.php',
+    'Categories.php',
     'Mailer.php',
     'Invites.php',
     'EmailConfirm.php',

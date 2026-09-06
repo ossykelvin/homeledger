@@ -107,6 +107,51 @@ email_confirm_assert(
     'Fresh schema should include email_verified_at.'
 );
 
+$checkEmail = (string) file_get_contents(dirname(__DIR__) . '/templates/pages/check-email.php');
+email_confirm_assert(
+    !str_contains($checkEmail, 'page=confirm'),
+    'Check-email page should not include a confirm URL.'
+);
+email_confirm_assert(
+    !str_contains($checkEmail, 'token='),
+    'Check-email page should not include a confirm token.'
+);
+email_confirm_assert(
+    !str_contains($checkEmail, 'email_confirm_pending_link'),
+    'Check-email page should not render a pending confirm URL.'
+);
+email_confirm_assert(
+    str_contains($checkEmail, 'Check your inbox'),
+    'Check-email page should tell the user to check their inbox.'
+);
+email_confirm_assert(
+    str_contains($checkEmail, '24 hours'),
+    'Check-email page should mention 24-hour expiry.'
+);
+email_confirm_assert(
+    str_contains($checkEmail, 'Resend confirmation'),
+    'Check-email page should offer resend.'
+);
+email_confirm_assert(!str_contains($checkEmail, '—'), 'Check-email page should not use an em dash.');
+
+$confirmSrc = (string) file_get_contents(dirname(__DIR__) . '/app/EmailConfirm.php');
+email_confirm_assert(
+    !str_contains($confirmSrc, 'Copy the link below'),
+    'Signup confirm copy should not tell the user to copy a URL.'
+);
+email_confirm_assert(
+    preg_match("/\\\$\_SESSION\\['email_confirm_link'\\]\\s*=/", $confirmSrc) !== 1,
+    'Confirm URL should not be stored in the session for UI display.'
+);
+email_confirm_assert(
+    str_contains($confirmSrc, 'We could not send the confirmation email. Try Resend confirmation.'),
+    'Failed sends should ask the user to try Resend without showing a URL.'
+);
+email_confirm_assert(
+    str_contains($html, $url) || str_contains($html, e($url)),
+    'Confirmation email HTML should still include the confirm URL.'
+);
+
 if ($failures > 0) {
     fwrite(STDERR, "Email confirm tests failed: {$failures}\n");
     exit(1);

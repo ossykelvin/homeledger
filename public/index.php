@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $publicPages = ['login', 'setup', 'register', 'check-email'];
-$appPages = ['dashboard', 'transactions', 'recurring', 'statement', 'household'];
+$appPages = ['dashboard', 'transactions', 'recurring', 'categories', 'statement', 'household'];
 $page = is_string($_GET['page'] ?? null) ? $_GET['page'] : 'dashboard';
 $currentUser = null;
 
@@ -112,6 +112,7 @@ $titles = [
     'dashboard' => 'Overview',
     'transactions' => 'Transactions',
     'recurring' => 'Recurring entries',
+    'categories' => 'Categories',
     'statement' => 'Statement',
     'household' => 'Household',
     'not-found' => 'Page not found',

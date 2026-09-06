@@ -90,6 +90,7 @@
     });
     dialog.addEventListener('close', () => {
       document.body.classList.remove('dialog-open');
+      hidePasswordsIn(dialog);
       if (dialog.id === 'profile-dialog') {
         document.querySelector('.profile-toggle')?.setAttribute('aria-expanded', 'false');
       }
@@ -173,6 +174,44 @@
     deleteDialog.querySelector('form')?.addEventListener('reset', () => requestAnimationFrame(() => syncDeleteAccountForm(deleteDialog)));
     syncDeleteAccountForm(deleteDialog);
   }
+
+  const setPasswordShown = (button, shown) => {
+    const input = button.closest('.password-field')?.querySelector('input');
+    if (!input) return;
+    input.type = shown ? 'text' : 'password';
+    button.setAttribute('aria-pressed', String(shown));
+    button.setAttribute('aria-label', shown ? 'Hide password' : 'Show password');
+    button.textContent = shown ? 'Hide' : 'Show';
+  };
+
+  const enhancePasswordFields = (root = document) => {
+    root.querySelectorAll('input[type="password"]').forEach((input) => {
+      if (input.closest('.password-field')) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'password-field';
+      input.parentNode?.insertBefore(wrap, input);
+      wrap.appendChild(input);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'password-toggle';
+      button.setAttribute('aria-label', 'Show password');
+      button.setAttribute('aria-pressed', 'false');
+      button.textContent = 'Show';
+      wrap.appendChild(button);
+    });
+  };
+
+  const hidePasswordsIn = (root) => {
+    root?.querySelectorAll('.password-toggle').forEach((button) => setPasswordShown(button, false));
+  };
+
+  enhancePasswordFields();
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest?.('.password-toggle');
+    if (!button) return;
+    event.preventDefault();
+    setPasswordShown(button, button.getAttribute('aria-pressed') !== 'true');
+  });
 
   const toast = document.querySelector('[data-toast]');
   toast?.querySelector('button')?.addEventListener('click', () => toast.remove());

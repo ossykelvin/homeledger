@@ -161,6 +161,7 @@ php tests/invite_mail_test.php
 php tests/email_confirm_test.php
 php tests/household_state_test.php
 php tests/account_delete_test.php
+php tests/categories_test.php
 find app public scripts tests templates -name '*.php' -print0 | xargs -0 -n1 php -l
 ```
 

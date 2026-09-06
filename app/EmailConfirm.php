@@ -15,20 +15,6 @@ function email_confirm_url(string $rawToken): string
     return app_public_url() . '/?page=confirm&token=' . rawurlencode($rawToken);
 }
 
-/** @return array{url: string, email: string}|null */
-function email_confirm_pending_link(): ?array
-{
-    $payload = $_SESSION['email_confirm_link'] ?? null;
-    if (!is_array($payload) || empty($payload['url']) || !is_string($payload['url'])) {
-        return null;
-    }
-
-    return [
-        'url' => $payload['url'],
-        'email' => is_string($payload['email'] ?? null) ? $payload['email'] : '',
-    ];
-}
-
 function pending_email_confirm_login(): string
 {
     $login = $_SESSION['pending_email_confirm'] ?? '';
@@ -164,6 +150,8 @@ function send_email_confirm_mail(string $to, string $url, DateTimeImmutable $exp
     $html = email_confirm_mail_html($url, $expires);
 
     if (!mail_is_configured()) {
+        error_log('HomeLedger email confirmation mail failed: mail is not configured');
+
         return 'unconfigured';
     }
 
@@ -183,7 +171,7 @@ function send_email_confirm_mail(string $to, string $url, DateTimeImmutable $exp
 function publish_email_confirm_link(string $email, string $rawToken, DateTimeImmutable $expiresAt): void
 {
     $url = email_confirm_url($rawToken);
-    $_SESSION['email_confirm_link'] = ['url' => $url, 'email' => $email];
+    unset($_SESSION['email_confirm_link']);
     $_SESSION['pending_email_confirm'] = $email;
     $_SESSION['email_confirm_mail_status'] = send_email_confirm_mail($email, $url, $expiresAt);
 }
@@ -209,35 +197,19 @@ function pull_email_confirm_mail_error(): string
 function flash_after_email_confirm_send(bool $resent): void
 {
     $status = pull_email_confirm_mail_status();
+    pull_email_confirm_mail_error();
     if ($status === 'sent') {
         flash(
             'success',
             $resent
-                ? 'Confirmation email sent. Check your inbox to activate HomeLedger. Copy the new link below if the email does not arrive.'
-                : 'Check your inbox to confirm this email and activate HomeLedger. Copy the link below if the email does not arrive.'
-        );
-
-        return;
-    }
-    if ($status === 'failed') {
-        $reason = pull_email_confirm_mail_error();
-        $reasonSuffix = $reason !== '' ? ' ' . $reason : '';
-        flash(
-            'error',
-            $resent
-                ? 'A new confirmation link was created but the email failed to send.' . $reasonSuffix . ' Copy the link below.'
-                : 'Your household was created but the confirmation email failed to send.' . $reasonSuffix . ' Copy the link below.'
+                ? 'Confirmation email sent. Check your inbox to activate HomeLedger.'
+                : 'Check your inbox to confirm this email and activate HomeLedger.'
         );
 
         return;
     }
 
-    flash(
-        'error',
-        $resent
-            ? 'A new confirmation link was created. Email is not configured. Copy the link below.'
-            : 'Your household was created. Email is not configured. Copy the link below to confirm this email.'
-    );
+    flash('error', 'We could not send the confirmation email. Try Resend confirmation.');
 }
 
 function issue_email_confirmation(int $userId, string $login): DateTimeImmutable
