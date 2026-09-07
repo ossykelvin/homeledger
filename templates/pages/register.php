@@ -45,5 +45,9 @@ $emailPrefill = $joining ? e($inviteEmail) : old_form('email');
         </label>
         <button class="primary-button" type="submit"><?= $joining ? 'Join household' : 'Create household' ?></button>
     </form>
+    <?php
+    $googleInvite = $joining ? $inviteToken : '';
+    require dirname(__DIR__) . '/partials/google-signin-button.php';
+    ?>
     <p class="auth-switch">Already have an account? <a href="?page=login">Sign in</a><?php if ($joining): ?> · <a href="?page=register">Create your own household</a><?php endif; ?></p>
 </section>

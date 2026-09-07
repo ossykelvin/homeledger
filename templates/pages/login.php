@@ -20,6 +20,10 @@ $pendingConfirmEmail = pending_email_confirm_login();
         </label>
         <button class="primary-button" type="submit">Sign in</button>
     </form>
+    <?php
+    $googleNext = safe_next_page(is_string($_GET['next'] ?? null) ? $_GET['next'] : null);
+    require dirname(__DIR__) . '/partials/google-signin-button.php';
+    ?>
     <?php if ($pendingConfirmEmail !== ''): ?>
         <form method="post" class="auth-form" autocomplete="off">
             <input type="hidden" name="_token" value="<?= e(csrf_token()) ?>">

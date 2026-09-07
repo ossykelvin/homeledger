@@ -72,6 +72,7 @@ $appFiles = [
     'Mailer.php',
     'Invites.php',
     'EmailConfirm.php',
+    'GoogleAuth.php',
     'AccountDelete.php',
     'StatementExport.php',
 ];
@@ -122,6 +123,10 @@ $config = [
     ],
     'brevo' => [
         'api_key' => env_get('BREVO_API_KEY') ?: '',
+    ],
+    'google' => [
+        'client_id' => env_get('GOOGLE_CLIENT_ID') ?: '',
+        'client_secret' => env_get('GOOGLE_CLIENT_SECRET') ?: '',
     ],
 ];
 

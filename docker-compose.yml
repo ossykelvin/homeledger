@@ -22,6 +22,8 @@ services:
       MAIL_FROM_NAME: ${MAIL_FROM_NAME:-HomeLedger}
       MAIL_ENCRYPTION: ${MAIL_ENCRYPTION:-tls}
       BREVO_API_KEY: ${BREVO_API_KEY:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
     volumes:
       - .:/var/www/html
     depends_on:

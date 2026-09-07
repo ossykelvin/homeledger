@@ -527,3 +527,155 @@ function change_current_user_password(string $current, string $new, string $conf
     ]);
     establish_user_session((int) $user['id']);
 }
+
+function clip_google_display_name(string $name, string $email): string
+{
+    $name = trim($name);
+    if ($name === '') {
+        $parts = explode('@', $email, 2);
+        $name = trim((string) ($parts[0] ?? ''));
+    }
+    if ($name === '') {
+        $name = 'Google user';
+    }
+    if (text_length($name) <= 80) {
+        return $name;
+    }
+
+    return function_exists('mb_substr') ? (string) mb_substr($name, 0, 80) : substr($name, 0, 80);
+}
+
+/**
+ * @return array<string, mixed>|null
+ */
+function find_google_linkable_user(PDO $pdo, string $login, string $sub): ?array
+{
+    if ($sub !== '') {
+        $bySub = $pdo->prepare(
+            'SELECT id, login, failed_attempts, locked_until, email_verified_at, google_sub
+             FROM users
+             WHERE google_sub = ?
+             FOR UPDATE'
+        );
+        $bySub->execute([$sub]);
+        $row = $bySub->fetch();
+        if (is_array($row)) {
+            return $row;
+        }
+    }
+
+    $byEmail = $pdo->prepare(
+        'SELECT id, login, failed_attempts, locked_until, email_verified_at, google_sub
+         FROM users
+         WHERE login = ?
+         FOR UPDATE'
+    );
+    $byEmail->execute([$login]);
+    $row = $byEmail->fetch();
+
+    return is_array($row) ? $row : null;
+}
+
+/**
+ * @param array{sub: string, email: string, name: string} $profile
+ * @return array{id: int, created: bool, joined: bool}
+ */
+function complete_google_sign_in(array $profile, string $rawInvite = ''): array
+{
+    prune_login_attempts();
+    if (ip_login_blocked()) {
+        throw new InvalidArgumentException(AUTH_LOCK_MESSAGE);
+    }
+
+    $login = normalize_login_email($profile['email']);
+    $sub = trim($profile['sub']);
+    $rawInvite = trim($rawInvite);
+    $displayName = clip_google_display_name($profile['name'], $login);
+
+    if (!valid_login_email($login) || $sub === '' || text_length($sub) > 255) {
+        throw new InvalidArgumentException(
+            'Google did not share an email address. Try another Google account or sign in with a password.'
+        );
+    }
+
+    $pdo = db();
+    $pdo->beginTransaction();
+    try {
+        $user = find_google_linkable_user($pdo, $login, $sub);
+        if (is_array($user)) {
+            clear_expired_lock($user);
+            if (!empty($user['locked_until']) && strtotime((string) $user['locked_until']) > time()) {
+                record_login_attempt($login);
+                throw new InvalidArgumentException(AUTH_LOCK_MESSAGE);
+            }
+
+            $reset = $pdo->prepare(
+                'UPDATE users
+                 SET failed_attempts = 0,
+                     locked_until = NULL,
+                     email_verified_at = COALESCE(email_verified_at, NOW()),
+                     email_confirm_token_hash = NULL,
+                     email_confirm_expires_at = NULL
+                 WHERE id = ?'
+            );
+            $reset->execute([(int) $user['id']]);
+            if (empty($user['google_sub'])) {
+                try {
+                    $link = $pdo->prepare('UPDATE users SET google_sub = ? WHERE id = ? AND google_sub IS NULL');
+                    $link->execute([$sub, (int) $user['id']]);
+                } catch (PDOException $exception) {
+                    if ((string) $exception->getCode() !== '23000') {
+                        throw $exception;
+                    }
+                }
+            }
+            $pdo->commit();
+
+            return [
+                'id' => (int) $user['id'],
+                'created' => false,
+                'joined' => false,
+            ];
+        }
+
+        if ($rawInvite !== '') {
+            $householdId = accept_open_invite($pdo, $rawInvite, $login);
+            $joined = true;
+        } else {
+            $householdName = household_name_from_display($displayName, '');
+            $householdId = adopt_or_create_household($pdo, $householdName);
+            $joined = false;
+        }
+
+        $stmt = $pdo->prepare(
+            'INSERT INTO users
+                (household_id, login, display_name, password_hash, google_sub, email_verified_at,
+                 email_confirm_token_hash, email_confirm_expires_at)
+             VALUES (?, ?, ?, ?, ?, NOW(), NULL, NULL)'
+        );
+        $stmt->execute([
+            $householdId,
+            $login,
+            $displayName,
+            password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT),
+            $sub,
+        ]);
+        $userId = (int) $pdo->lastInsertId();
+        if ($rawInvite === '') {
+            $setOwner = $pdo->prepare('UPDATE households SET owner_user_id = ? WHERE id = ?');
+            $setOwner->execute([$userId, $householdId]);
+        }
+        $pdo->commit();
+
+        return [
+            'id' => $userId,
+            'created' => true,
+            'joined' => $joined,
+        ];
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $exception;
+    }
+}
