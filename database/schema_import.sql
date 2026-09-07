@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
   login VARCHAR(190) NOT NULL,
   display_name VARCHAR(80) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
+  google_sub VARCHAR(255) NULL,
   failed_attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
   locked_until DATETIME NULL,
   email_verified_at DATETIME NULL,
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY users_login_unique (login),
+  UNIQUE KEY users_google_sub_unique (google_sub),
   UNIQUE KEY users_email_confirm_token_hash_unique (email_confirm_token_hash),
   KEY users_household_index (household_id),
   CONSTRAINT user_household_fk FOREIGN KEY (household_id) REFERENCES households(id)

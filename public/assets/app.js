@@ -17,16 +17,38 @@
 
   const sidebar = document.querySelector('#sidebar');
   const menuButton = document.querySelector('.menu-toggle');
-  menuButton?.addEventListener('click', () => {
-    const open = sidebar?.classList.toggle('open') ?? false;
-    menuButton.setAttribute('aria-expanded', String(open));
+  const navBackdrop = document.querySelector('[data-nav-backdrop]');
+  const NAV_BREAKPOINT = 860;
+
+  const setNavOpen = (open) => {
+    sidebar?.classList.toggle('open', open);
+    document.body.classList.toggle('nav-open', open);
+    menuButton?.setAttribute('aria-expanded', String(open));
+    menuButton?.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    if (navBackdrop) navBackdrop.hidden = !open;
+  };
+
+  menuButton?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    setNavOpen(!sidebar?.classList.contains('open'));
+  });
+  navBackdrop?.addEventListener('click', () => setNavOpen(false));
+  sidebar?.querySelectorAll('a').forEach((link) => {
+    link.addEventListener('click', () => {
+      if (window.innerWidth <= NAV_BREAKPOINT) setNavOpen(false);
+    });
   });
   document.addEventListener('click', (event) => {
-    if (window.innerWidth > 860 || !sidebar?.classList.contains('open')) return;
+    if (window.innerWidth > NAV_BREAKPOINT || !sidebar?.classList.contains('open')) return;
     if (!sidebar.contains(event.target) && !menuButton?.contains(event.target)) {
-      sidebar.classList.remove('open');
-      menuButton?.setAttribute('aria-expanded', 'false');
+      setNavOpen(false);
     }
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && sidebar?.classList.contains('open')) setNavOpen(false);
+  });
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > NAV_BREAKPOINT) setNavOpen(false);
   });
 
   const openDialog = (dialog, reset = true) => {

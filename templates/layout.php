@@ -127,7 +127,7 @@
     <?php endif; ?>
 <?php endif; ?>
 
-<div class="dialog-backdrop" data-dialog-backdrop hidden></div>
+<div class="nav-backdrop" data-nav-backdrop hidden></div>
 <script src="assets/app.js" defer></script>
 </body>
 </html>

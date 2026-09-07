@@ -1,10 +1,11 @@
-const CACHE_NAME = 'homeledger-shell-v20';
+const CACHE_NAME = 'homeledger-shell-v22';
 const STATIC_ASSETS = [
   './assets/app.css',
   './assets/app.js',
   './assets/icons/sprite.svg',
   './assets/brand/logo-dark.png',
   './assets/brand/logo-light.png',
+  './assets/brand/google-g.png',
   './assets/brand/favicon.ico',
   './assets/brand/favicon-16.png',
   './assets/brand/favicon-32.png',

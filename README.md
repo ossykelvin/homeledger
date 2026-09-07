@@ -14,7 +14,7 @@ HomeLedger is a household financial tracker built with PHP and MySQL. Each signe
 - GBP defaults, with currency and timezone controlled through environment variables
 - Responsive light and dark modes based on the supplied Kokoszone theme
 - Installable desktop experience for Chrome and Microsoft Edge
-- Household sign-in and registration. New households confirm email before first sign-in. Invite joins skip that extra email. Every money row is scoped to a `household_id`.
+- Household sign-in and registration, including optional Sign in with Google. New password households confirm email before first sign-in. Google sign-in and invite joins skip that extra email. Every money row is scoped to a `household_id`.
 - Household hub (`?page=household`): name, public household ID, members, and 24-hour invites with resend. `?page=invite` redirects here.
 - Settings: signed-in users open the profile icon in the top bar to change display name, household name, and password, or to permanently delete their account. Email and household ID are read-only.
 - Prepared statements, output escaping, CSRF protection and server-side validation
@@ -42,6 +42,7 @@ Requirements: Docker Desktop with Docker Compose.
    Get-Content -Raw .\database\migrations\006_household_state_version.sql | docker compose exec -T db mysql -u homeledger -pchange-this-password homeledger
    Get-Content -Raw .\database\migrations\007_email_confirmation.sql | docker compose exec -T db mysql -u homeledger -pchange-this-password homeledger
    Get-Content -Raw .\database\migrations\008_household_owner_user.sql | docker compose exec -T db mysql -u homeledger -pchange-this-password homeledger
+   Get-Content -Raw .\database\migrations\009_google_sub.sql | docker compose exec -T db mysql -u homeledger -pchange-this-password homeledger
    ```
 
    If `003` stopped mid-run, apply `003b_finish_transaction_household.sql` before `004`. Do not run `docker compose down -v`.
@@ -93,7 +94,7 @@ Requirements: PHP 8.1 or later, MySQL 8 or MariaDB 10.6 or later, and the PDO My
 6. Configure the variables shown in `.env.example` through the hosting control panel or Apache environment configuration.
 7. Use HTTPS before installing the PWA or making the site available beyond localhost. Create the owner account on first visit.
 
-For Namecheap cPanel Git Version Control, keep the clone at `~/homeledger` and the document root at `~/homeledger/public` (not `public_html`). `.cpanel.yml` copies `app`, `templates`, `public`, `scripts`, and `database` into `$HOME/homeledger` when the Git clone is a separate folder. If the clone is already that path, deploy is a no-op after pull. It never copies `.env` and never imports `schema.sql` or runs migrations. After a GitHub push: cPanel → Files → Git Version Control → Manage → **Update from Remote**, then **Deploy HEAD Commit**. If cPanel still reports uncommitted changes, those are local edits on the server checkout (often leftover File Manager uploads). Discard tracked files there and leave `.env` untracked. Do not commit `.env` from the server. Apply `database/migrations/007_email_confirmation.sql` and `008_household_owner_user.sql` in phpMyAdmin yourself.
+For Namecheap cPanel Git Version Control, keep the clone at `~/homeledger` and the document root at `~/homeledger/public` (not `public_html`). `.cpanel.yml` copies `app`, `templates`, `public`, `scripts`, and `database` into `$HOME/homeledger` when the Git clone is a separate folder. If the clone is already that path, deploy is a no-op after pull. It never copies `.env` and never imports `schema.sql` or runs migrations. After a GitHub push: cPanel → Files → Git Version Control → Manage → **Update from Remote**, then **Deploy HEAD Commit**. If cPanel still reports uncommitted changes, those are local edits on the server checkout (often leftover File Manager uploads). Discard tracked files there and leave `.env` untracked. Do not commit `.env` from the server. Apply `database/migrations/007_email_confirmation.sql`, `008_household_owner_user.sql` and `009_google_sub.sql` in phpMyAdmin yourself.
 
 The `.env.example` file documents the expected values. The application reads real operating-system environment variables and does not load `.env` files by itself.
 
@@ -129,11 +130,35 @@ Signed-in members open **Household** to see the household name (editable), the p
 
 Send a 24-hour join link from the same page. When `MAIL_*` is set, HomeLedger sends the invite over SMTP (STARTTLS). The page always shows the URL to copy. **Resend** on a pending or expired unused invite issues a new token, resets expiry to 24 hours, and retires the old link.
 
-The invitee opens `/?page=register&invite=TOKEN`, signs up with that email, and is attached to the same household. No new household and no extra category seed. Used, expired or unknown tokens show an error and offer a normal register (which creates a different household).
+The invitee opens `/?page=register&invite=TOKEN`, signs up with that email, and is attached to the same household. No new household and no extra category seed. Used, expired or unknown tokens show an error and offer a normal register (which creates a different household). Google sign-in on that page uses the same invite.
 
 Uninvited register still creates a new household. The only exception is the first user on a volume with no `users` rows when an existing household already has transactions: that account keeps the existing ledger.
 
 Set `APP_URL` to `https://homeledger.koptechnology.co.uk` so invite emails and join links use the public origin. The app itself still listens on `http://localhost:8080` in Compose; the fallback `APP_URL` in `docker-compose.yml` is only used if `.env` omits it. If `APP_URL` is empty, the app uses the current request host.
+
+## Sign in with Google
+
+The Sign in with Google button is shown on login and register only when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. If those are empty, the button is hidden and the login page still works.
+
+1. Open [Google Cloud Console](https://console.cloud.google.com/).
+2. Create or select a project, then open **APIs & Services → OAuth consent screen**. Choose External, add the app name, and include the `email`, `profile` and `openid` scopes. While the consent screen is in Testing, add the Google accounts that may sign in as test users.
+3. Open **APIs & Services → Credentials → Create credentials → OAuth client ID**. Application type is **Web application**.
+4. Add these authorized JavaScript origins:
+   - `http://localhost:8080`
+   - `https://homeledger.koptechnology.co.uk`
+5. Add these authorized redirect URIs (they must match exactly, including the query string):
+   - `http://localhost:8080/?page=google-callback`
+   - `https://homeledger.koptechnology.co.uk/?page=google-callback`
+6. Copy the client ID and client secret into `.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Leave them empty in `.env.example`. Do not commit `.env`.
+7. Recreate the app container so Compose passes the new values:
+
+   ```bash
+   docker compose up -d --force-recreate --no-deps app
+   ```
+
+Do not run `docker compose down -v`. Live volumes also need `database/migrations/009_google_sub.sql` applied once.
+
+Google start is `/?page=google`. The callback is `/?page=google-callback`. The redirect URI sent to Google is `rtrim(APP_URL, '/') . '/?page=google-callback'`, except on localhost Docker browse where it is `http://localhost:8080/?page=google-callback`. A signed-in Google user is treated as email-verified (no extra confirm email). An existing `users.login` match is signed in and the password is not used. A new email creates a household and owner and seeds categories, unless an invite token is in the session or query, in which case they join that household. Locked accounts stay locked.
 
 ## Invite email (SMTP)
 
@@ -162,6 +187,7 @@ php tests/email_confirm_test.php
 php tests/household_state_test.php
 php tests/account_delete_test.php
 php tests/categories_test.php
+php tests/google_oauth_test.php
 find app public scripts tests templates -name '*.php' -print0 | xargs -0 -n1 php -l
 ```
 

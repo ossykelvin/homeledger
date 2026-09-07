@@ -56,6 +56,16 @@ if (!$setupError && $page === 'confirm') {
 if (!$setupError) {
     $currentUser = current_user();
 
+    if ($page === 'google' || $page === 'google-callback') {
+        if ($currentUser !== null) {
+            redirect('dashboard');
+        }
+        if ($page === 'google') {
+            start_google_oauth();
+        }
+        complete_google_oauth_callback();
+    }
+
     if ($page === 'household_sync') {
         header('Content-Type: application/json; charset=UTF-8');
         if ($currentUser === null) {
