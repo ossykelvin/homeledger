@@ -112,6 +112,7 @@ if (!$setupError) {
             $page = 'not-found';
         } else {
             materialise_due_recurring_entries(null, current_household_id());
+            dispatch_household_spend_alerts(current_household_id());
         }
     }
 } elseif (!in_array($page, $appPages, true)) {

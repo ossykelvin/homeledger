@@ -425,7 +425,7 @@ function load_statement(string $from, string $to): array
     $entryCount = (int) $summary['entry_count'];
 
     $categoryStmt = db()->prepare(
-        'SELECT c.name, c.colour, t.type, SUM(t.amount) AS total
+        'SELECT c.id, c.name, c.colour, t.type, SUM(t.amount) AS total
          FROM transactions t
          JOIN categories c ON c.id = t.category_id AND c.household_id = t.household_id
          WHERE t.household_id = ? AND t.transaction_date BETWEEN ? AND ?

@@ -15,6 +15,15 @@ $truncated = $statement['truncated'];
 $listLimit = $statement['list_limit'];
 $fromLabel = $statement['from_label'];
 $toLabel = $statement['to_label'];
+$budgetProgress = household_budget_progress($from, $to);
+$budgetWarnings = [];
+$budgetByCategory = [];
+foreach ($budgetProgress as $item) {
+    $budgetByCategory[(int) $item['id']] = $item;
+    if ($item['over']) {
+        $budgetWarnings[] = $item;
+    }
+}
 ?>
 
 <section class="content-section">
@@ -55,6 +64,8 @@ $toLabel = $statement['to_label'];
     <?php endif; ?>
 
     <p class="period-caption"><?= e($fromLabel) ?> to <?= e($toLabel) ?> · <?= $entryCount ?> <?= $entryCount === 1 ? 'entry' : 'entries' ?></p>
+
+    <?php require dirname(__DIR__) . '/partials/budget-warnings.php'; ?>
 
     <div class="summary-grid period-summary">
         <article class="summary-card">
@@ -102,10 +113,11 @@ $toLabel = $statement['to_label'];
                 <div class="spending-list">
                     <?php foreach ($expenseCategories as $item):
                         $percent = $expense > 0 ? ((float) $item['total'] / $expense) * 100 : 0;
+                        $budgetRow = $budgetByCategory[(int) ($item['id'] ?? 0)] ?? null;
                     ?>
-                        <div class="spending-item">
+                        <div class="spending-item<?= $budgetRow && $budgetRow['over'] ? ' over-budget' : '' ?>">
                             <div><span class="category-dot" style="--category-colour: <?= e($item['colour']) ?>"></span><strong><?= e($item['name']) ?></strong></div>
-                            <span><?= money($item['total']) ?></span>
+                            <span><?= money($item['total']) ?><?php if ($budgetRow): ?> <small class="budget-meta"><?= $budgetRow['over'] ? 'Over' : 'of' ?> <?= money($budgetRow['period_budget']) ?></small><?php endif; ?></span>
                             <i><b style="--width: <?= e((string) $percent) ?>%; --category-colour: <?= e($item['colour']) ?>"></b></i>
                         </div>
                     <?php endforeach; ?>

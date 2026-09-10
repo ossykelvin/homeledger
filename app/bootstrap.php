@@ -75,6 +75,11 @@ $appFiles = [
     'GoogleAuth.php',
     'AccountDelete.php',
     'StatementExport.php',
+    'Activity.php',
+    'Budgets.php',
+    'HouseholdMembers.php',
+    'CsvTransfer.php',
+    'HouseholdBackup.php',
 ];
 foreach ($appFiles as $appFile) {
     $path = $basePath . '/app/' . $appFile;

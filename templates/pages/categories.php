@@ -27,6 +27,7 @@ $colourPrefill = old_form(
 $editingUsed = $editing !== null && (
     (int) $editing['transaction_count'] > 0 || (int) $editing['recurring_count'] > 0
 );
+$categoryBudgets = household_category_budgets();
 
 $incomeCategories = [];
 $expenseCategories = [];
@@ -45,8 +46,8 @@ foreach ($allCategories as $category) {
             <p class="section-kicker">LEDGER LABELS</p>
             <h2>Income and expense categories.</h2>
             <p><?= e($canManageCategories
-                ? 'Add household categories and rename the starters. Type can change only when nothing uses the category. Used categories cannot be deleted.'
-                : 'These labels group income and expense entries for this household. Only the owner can add or edit them.') ?></p>
+                ? 'Add household categories and rename the starters. Type can change only when nothing uses the category. Used categories cannot be deleted. Set a monthly budget on expense categories.'
+                : 'These labels group income and expense entries for this household. Only the owner can add, edit or set budgets.') ?></p>
         </div>
     </div>
 
@@ -91,7 +92,7 @@ foreach ($allCategories as $category) {
         <p class="range-note">Only the household owner can add, rename or delete categories. You can still use them on transactions and recurring entries.</p>
     <?php endif; ?>
 
-    <?php foreach ([['Income', $incomeCategories], ['Expense', $expenseCategories]] as [$heading, $rows]): ?>
+    <?php foreach ([['Income', $incomeCategories, false], ['Expense', $expenseCategories, true]] as [$heading, $rows, $showBudget]): ?>
         <div class="household-section">
             <div class="panel-heading">
                 <div>
@@ -106,6 +107,9 @@ foreach ($allCategories as $category) {
                             <tr>
                                 <th>Name</th>
                                 <th>Use</th>
+                                <?php if ($showBudget): ?>
+                                    <th>Monthly budget</th>
+                                <?php endif; ?>
                                 <?php if ($canManageCategories): ?>
                                     <th class="align-right">Action</th>
                                 <?php endif; ?>
@@ -115,6 +119,7 @@ foreach ($allCategories as $category) {
                             <?php foreach ($rows as $category):
                                 $used = (int) $category['transaction_count'] > 0 || (int) $category['recurring_count'] > 0;
                                 $isEditingRow = $editing !== null && (int) $editing['id'] === (int) $category['id'];
+                                $budgetAmount = $categoryBudgets[(int) $category['id']] ?? null;
                             ?>
                                 <tr<?= $isEditingRow ? ' class="category-editing-row"' : '' ?>>
                                     <td>
@@ -124,6 +129,31 @@ foreach ($allCategories as $category) {
                                         </span>
                                     </td>
                                     <td><?= e(category_usage_label($category)) ?></td>
+                                    <?php if ($showBudget): ?>
+                                        <td>
+                                            <?php if ($canManageCategories): ?>
+                                                <form method="post" class="budget-inline-form" autocomplete="off">
+                                                    <input type="hidden" name="_token" value="<?= e(csrf_token()) ?>">
+                                                    <input type="hidden" name="action" value="save_budget">
+                                                    <input type="hidden" name="category_id" value="<?= (int) $category['id'] ?>">
+                                                    <input
+                                                        name="amount"
+                                                        type="number"
+                                                        inputmode="decimal"
+                                                        min="0"
+                                                        step="0.01"
+                                                        max="99999999999.99"
+                                                        value="<?= $budgetAmount !== null ? e(number_format((float) $budgetAmount, 2, '.', '')) : '' ?>"
+                                                        placeholder="None"
+                                                        aria-label="<?= e((string) $category['name']) ?> monthly budget"
+                                                    >
+                                                    <button class="secondary-button" type="submit">Save</button>
+                                                </form>
+                                            <?php else: ?>
+                                                <?= $budgetAmount !== null ? e(money((float) $budgetAmount)) : 'None' ?>
+                                            <?php endif; ?>
+                                        </td>
+                                    <?php endif; ?>
                                     <?php if ($canManageCategories): ?>
                                         <td class="align-right">
                                             <div class="invite-row-actions">
@@ -143,7 +173,7 @@ foreach ($allCategories as $category) {
                             <?php endforeach; ?>
                             <?php if (!$rows): ?>
                                 <tr>
-                                    <td colspan="<?= $canManageCategories ? 3 : 2 ?>">
+                                    <td colspan="<?= 2 + ($showBudget ? 1 : 0) + ($canManageCategories ? 1 : 0) ?>">
                                         <div class="empty-state compact">
                                             <span>No <?= e(strtolower((string) $heading)) ?> categories</span>
                                             <p><?= e($canManageCategories

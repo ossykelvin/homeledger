@@ -126,10 +126,7 @@ function account_delete_cleanup(PDO $pdo, array $userIds, array $householdIds): 
             continue;
         }
         $pdo->prepare('UPDATE households SET owner_user_id = NULL WHERE id = ?')->execute([$householdId]);
-        $pdo->prepare('DELETE FROM household_invites WHERE household_id = ?')->execute([$householdId]);
-        $pdo->prepare('DELETE FROM transactions WHERE household_id = ?')->execute([$householdId]);
-        $pdo->prepare('DELETE FROM recurring_entries WHERE household_id = ?')->execute([$householdId]);
-        $pdo->prepare('DELETE FROM categories WHERE household_id = ?')->execute([$householdId]);
+        wipe_household_dependent_rows($pdo, $householdId);
         $pdo->prepare('DELETE FROM users WHERE household_id = ?')->execute([$householdId]);
         $pdo->prepare('DELETE FROM households WHERE id = ?')->execute([$householdId]);
     }
