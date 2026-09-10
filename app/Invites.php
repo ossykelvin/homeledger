@@ -361,6 +361,13 @@ function create_household_invite(string $email): string
             $expiresAt->format('Y-m-d H:i:s'),
         ]);
         bump_household_state($pdo, $householdId);
+        log_household_activity(
+            $householdId,
+            (int) $user['id'],
+            'invited',
+            'Invited ' . $login,
+            $pdo
+        );
         $pdo->commit();
     } catch (Throwable $exception) {
         if ($pdo->inTransaction()) {

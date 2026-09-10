@@ -37,10 +37,7 @@ function google_oauth_cleanup(PDO $pdo, array $userIds, array $householdIds): vo
             continue;
         }
         $pdo->prepare('UPDATE households SET owner_user_id = NULL WHERE id = ?')->execute([$householdId]);
-        $pdo->prepare('DELETE FROM household_invites WHERE household_id = ?')->execute([$householdId]);
-        $pdo->prepare('DELETE FROM transactions WHERE household_id = ?')->execute([$householdId]);
-        $pdo->prepare('DELETE FROM recurring_entries WHERE household_id = ?')->execute([$householdId]);
-        $pdo->prepare('DELETE FROM categories WHERE household_id = ?')->execute([$householdId]);
+        wipe_household_dependent_rows($pdo, $householdId);
         $pdo->prepare('DELETE FROM users WHERE household_id = ?')->execute([$householdId]);
         $pdo->prepare('DELETE FROM households WHERE id = ?')->execute([$householdId]);
     }
@@ -50,7 +47,7 @@ $root = dirname(__DIR__);
 $migration = (string) file_get_contents($root . '/database/migrations/009_google_sub.sql');
 $schema = (string) file_get_contents($root . '/database/schema.sql');
 $schemaImport = (string) file_get_contents($root . '/database/schema_import.sql');
-$envExample = (string) file_get_contents($root . '/.env.example');
+$envExample = str_replace("\r", '', (string) file_get_contents($root . '/.env.example'));
 $compose = (string) file_get_contents($root . '/docker-compose.yml');
 $login = (string) file_get_contents($root . '/templates/pages/login.php');
 $register = (string) file_get_contents($root . '/templates/pages/register.php');
@@ -71,7 +68,7 @@ google_oauth_assert(str_contains($compose, 'GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID
 google_oauth_assert(str_contains($compose, 'GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}'), 'Compose should pass GOOGLE_CLIENT_SECRET from env.');
 google_oauth_assert(str_contains($login, 'google-signin-button.php'), 'Login should include the Google button partial.');
 google_oauth_assert(str_contains($register, 'google-signin-button.php'), 'Register should include the Google button partial.');
-google_oauth_assert(str_contains($sw, 'homeledger-shell-v22'), 'Service worker should bump cache after adding the Google logo.');
+google_oauth_assert(str_contains($sw, 'homeledger-shell-v24'), 'Service worker should bump cache after adding the Google logo.');
 google_oauth_assert(str_contains($sw, 'google-g.png'), 'Service worker should cache the Google G logo.');
 google_oauth_assert(str_contains($index, "page === 'google'"), 'Front controller should handle Google start.');
 google_oauth_assert(str_contains($index, 'google-callback'), 'Front controller should handle Google callback.');

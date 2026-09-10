@@ -403,6 +403,14 @@ function create_household_owner(
         if ($rawInvite === '') {
             $setOwner = $pdo->prepare('UPDATE households SET owner_user_id = ? WHERE id = ?');
             $setOwner->execute([$userId, $householdId]);
+        } else {
+            log_household_activity(
+                $householdId,
+                $userId,
+                'joined',
+                $displayName . ' joined the household',
+                $pdo
+            );
         }
         $pdo->commit();
     } catch (Throwable $exception) {
@@ -485,10 +493,17 @@ function update_current_household_name(string $householdName): void
         throw new InvalidArgumentException('Enter a household name of up to 80 characters.');
     }
 
+    $householdId = current_household_id();
     $stmt = db()->prepare(
         'UPDATE households SET name = ?, state_version = state_version + 1 WHERE id = ?'
     );
-    $stmt->execute([$householdName, current_household_id()]);
+    $stmt->execute([$householdName, $householdId]);
+    log_household_activity(
+        $householdId,
+        current_actor_user_id(),
+        'household_renamed',
+        'Renamed household to ' . $householdName
+    );
 }
 
 function change_current_user_password(string $current, string $new, string $confirm): void
@@ -664,6 +679,14 @@ function complete_google_sign_in(array $profile, string $rawInvite = ''): array
         if ($rawInvite === '') {
             $setOwner = $pdo->prepare('UPDATE households SET owner_user_id = ? WHERE id = ?');
             $setOwner->execute([$userId, $householdId]);
+        } else {
+            log_household_activity(
+                $householdId,
+                $userId,
+                'joined',
+                $displayName . ' joined the household',
+                $pdo
+            );
         }
         $pdo->commit();
 

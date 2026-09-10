@@ -12,7 +12,7 @@
     <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
     <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
     <link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png">
-    <link rel="stylesheet" href="assets/app.css">
+    <link rel="stylesheet" href="assets/app.css?v=24">
     <script>
         (function () {
             var theme = localStorage.getItem('homeledger-theme') ||
@@ -128,6 +128,6 @@
 <?php endif; ?>
 
 <div class="nav-backdrop" data-nav-backdrop hidden></div>
-<script src="assets/app.js" defer></script>
+<script src="assets/app.js?v=24" defer></script>
 </body>
 </html>

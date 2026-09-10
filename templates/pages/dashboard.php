@@ -28,7 +28,7 @@ $recentStmt->execute([current_household_id(), $monthStart, $monthEnd]);
 $recent = $recentStmt->fetchAll();
 
 $categoryStmt = db()->prepare(
-    'SELECT c.name, c.colour, SUM(t.amount) AS total
+    'SELECT c.id, c.name, c.colour, SUM(t.amount) AS total
      FROM transactions t JOIN categories c ON c.id = t.category_id AND c.household_id = t.household_id
      WHERE t.household_id = ? AND t.type = \'expense\' AND t.transaction_date BETWEEN ? AND ?
      GROUP BY c.id, c.name, c.colour ORDER BY total DESC LIMIT 5'
@@ -71,6 +71,15 @@ $upcomingStmt = db()->prepare(
 );
 $upcomingStmt->execute([current_household_id()]);
 $upcoming = $upcomingStmt->fetchAll();
+$budgetProgress = household_budget_progress($monthStart, $monthEnd);
+$budgetWarnings = [];
+$budgetByCategory = [];
+foreach ($budgetProgress as $item) {
+    $budgetByCategory[(int) $item['id']] = $item;
+    if ($item['over']) {
+        $budgetWarnings[] = $item;
+    }
+}
 ?>
 
 <section class="dashboard-section">
@@ -115,6 +124,28 @@ $upcoming = $upcomingStmt->fetchAll();
         </article>
     </div>
 
+    <?php require dirname(__DIR__) . '/partials/budget-warnings.php'; ?>
+
+    <?php if ($budgetProgress): ?>
+        <article class="panel budget-panel">
+            <div class="panel-heading">
+                <div><span class="eyebrow">BUDGETS</span><h3>This month vs budget</h3></div>
+                <a class="text-link" href="?page=categories">Set budgets <span>↗</span></a>
+            </div>
+            <div class="spending-list">
+                <?php foreach ($budgetProgress as $item):
+                    $percent = (float) $item['percent'];
+                ?>
+                    <div class="spending-item<?= $item['over'] ? ' over-budget' : '' ?>">
+                        <div><span class="category-dot" style="--category-colour: <?= e($item['colour']) ?>"></span><strong><?= e($item['name']) ?></strong></div>
+                        <span><?= money($item['spent']) ?> of <?= money($item['period_budget']) ?></span>
+                        <i><b style="--width: <?= e((string) min(100, $percent)) ?>%; --category-colour: <?= e($item['colour']) ?>"></b></i>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </article>
+    <?php endif; ?>
+
     <div class="dashboard-grid">
         <article class="panel cashflow-panel">
             <div class="panel-heading">
@@ -140,10 +171,11 @@ $upcoming = $upcomingStmt->fetchAll();
                 <div class="spending-list">
                     <?php foreach ($spendingCategories as $item):
                         $percent = $expense > 0 ? ((float) $item['total'] / $expense) * 100 : 0;
+                        $budgetRow = $budgetByCategory[(int) ($item['id'] ?? 0)] ?? null;
                     ?>
-                        <div class="spending-item">
+                        <div class="spending-item<?= $budgetRow && $budgetRow['over'] ? ' over-budget' : '' ?>">
                             <div><span class="category-dot" style="--category-colour: <?= e($item['colour']) ?>"></span><strong><?= e($item['name']) ?></strong></div>
-                            <span><?= money($item['total']) ?></span>
+                            <span><?= money($item['total']) ?><?php if ($budgetRow): ?> <small class="budget-meta"><?= $budgetRow['over'] ? 'Over' : 'of' ?> <?= money($budgetRow['period_budget']) ?></small><?php endif; ?></span>
                             <i><b style="--width: <?= e((string) $percent) ?>%; --category-colour: <?= e($item['colour']) ?>"></b></i>
                         </div>
                     <?php endforeach; ?>

@@ -62,6 +62,15 @@ function handle_post_action(): never
             case 'export_statement_excel':
                 export_statement('excel');
                 break;
+            case 'save_category':
+                save_category();
+                break;
+            case 'delete_category':
+                delete_category();
+                break;
+            case 'save_budget':
+                save_budget();
+                break;
             case 'send_invite':
                 send_invite();
                 break;
@@ -71,11 +80,29 @@ function handle_post_action(): never
             case 'resend_invite':
                 resend_invite();
                 break;
-            case 'save_category':
-                save_category();
+            case 'remove_member':
+                remove_member();
                 break;
-            case 'delete_category':
-                delete_category();
+            case 'export_csv_transactions':
+                export_household_transactions_csv();
+                break;
+            case 'export_csv_recurring':
+                export_household_recurring_csv();
+                break;
+            case 'preview_csv_import':
+                preview_csv_import();
+                break;
+            case 'confirm_csv_import':
+                confirm_csv_import();
+                break;
+            case 'cancel_csv_import':
+                cancel_csv_import();
+                break;
+            case 'download_household_backup':
+                download_encrypted_household_backup();
+                break;
+            case 'restore_household_backup':
+                restore_encrypted_household_backup();
                 break;
             case 'update_profile':
                 update_profile();
@@ -125,10 +152,15 @@ function redirect_after_action_error(string $action): never
         $from = is_string($_POST['from'] ?? null) ? $_POST['from'] : '';
         redirect($from === 'check-email' ? 'check-email' : 'login');
     }
-    if (str_contains($action, 'invite')) {
+    if (
+        str_contains($action, 'invite')
+        || $action === 'remove_member'
+        || str_contains($action, 'csv')
+        || str_contains($action, 'backup')
+    ) {
         redirect('household');
     }
-    if (str_contains($action, 'category')) {
+    if (str_contains($action, 'category') || $action === 'save_budget') {
         $editId = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT) ?: 0;
         redirect('categories', $action === 'save_category' && $editId > 0 ? ['edit' => (string) $editId] : []);
     }
@@ -293,6 +325,81 @@ function delete_category(): void
     delete_household_category((int) $id);
     flash('success', 'Category deleted.');
     redirect('categories');
+}
+
+function save_budget(): void
+{
+    $categoryId = filter_input(INPUT_POST, 'category_id', FILTER_VALIDATE_INT) ?: 0;
+    save_category_budget((int) $categoryId, (string) ($_POST['amount'] ?? ''));
+    flash('success', 'Budget saved.');
+    redirect('categories');
+}
+
+function remove_member(): void
+{
+    $memberId = filter_input(INPUT_POST, 'user_id', FILTER_VALIDATE_INT) ?: 0;
+    remove_household_member(
+        (int) $memberId,
+        (string) ($_POST['current_password'] ?? ''),
+        (string) ($_POST['confirm_household_id'] ?? '')
+    );
+    flash('success', 'That member was removed from the household.');
+    redirect('household');
+}
+
+function preview_csv_import(): void
+{
+    preview_household_csv_import();
+    $preview = csv_import_preview_for_page();
+    $count = is_array($preview) ? count($preview['rows'] ?? []) : 0;
+    $kind = is_array($preview) ? (string) ($preview['kind'] ?? 'transactions') : 'transactions';
+    $label = $kind === 'recurring' ? 'recurring entries' : 'transactions';
+    flash('success', 'This file looks valid. Confirm to import ' . $count . ' ' . $label . '.');
+    redirect('household');
+}
+
+function confirm_csv_import(): void
+{
+    $result = confirm_household_csv_import((string) ($_POST['import_token'] ?? ''));
+    $label = $result['kind'] === 'recurring' ? 'recurring entries' : 'transactions';
+    $message = $result['inserted'] . ' ' . $label . ' imported.';
+    if ($result['skipped'] > 0) {
+        $message .= ' ' . $result['skipped'] . ' already present were skipped.';
+    }
+    flash('success', $message);
+    redirect('household');
+}
+
+function cancel_csv_import(): void
+{
+    clear_csv_import_preview();
+    flash('success', 'The CSV import was cancelled.');
+    redirect('household');
+}
+
+function download_encrypted_household_backup(): never
+{
+    download_household_backup(
+        (string) ($_POST['backup_passphrase'] ?? ''),
+        (string) ($_POST['backup_passphrase_confirm'] ?? '')
+    );
+}
+
+function restore_encrypted_household_backup(): void
+{
+    $result = restore_household_backup_from_upload(
+        (string) ($_POST['backup_passphrase'] ?? ''),
+        (string) ($_POST['current_password'] ?? ''),
+        (string) ($_POST['confirm_household_id'] ?? ''),
+        isset($_POST['replace_ledger']) && (string) $_POST['replace_ledger'] === '1'
+    );
+    $message = 'Backup restored: ' . $result['transactions'] . ' transactions, '
+        . $result['recurring'] . ' recurring entries.';
+    if ($result['skipped'] > 0) {
+        $message .= ' ' . $result['skipped'] . ' already present were skipped.';
+    }
+    flash('success', $message);
+    redirect('household');
 }
 
 function profile_return_page(): string

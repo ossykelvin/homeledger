@@ -231,14 +231,17 @@ function send_account_notice_mail(
     }
 }
 
-function assert_household_id_confirmation(string $typed, string $expected): void
-{
+function assert_household_id_confirmation(
+    string $typed,
+    string $expected,
+    string $mismatchMessage = 'Type the household ID exactly to confirm deletion.'
+): void {
     $key = household_public_code_key($typed);
     if ($key === '' || (ctype_digit($key) && strlen($key) < HOUSEHOLD_PUBLIC_CODE_LENGTH)) {
         throw new InvalidArgumentException('Type the household ID shown in your profile, not a number.');
     }
     if (!household_public_codes_equal($expected, $typed)) {
-        throw new InvalidArgumentException('Type the household ID exactly to confirm deletion.');
+        throw new InvalidArgumentException($mismatchMessage);
     }
 }
 
@@ -266,6 +269,9 @@ function household_member_row(PDO $pdo, int $householdId, int $userId): ?array
 
 function wipe_household_dependent_rows(PDO $pdo, int $householdId): void
 {
+    $pdo->prepare('DELETE FROM household_spend_alerts WHERE household_id = ?')->execute([$householdId]);
+    $pdo->prepare('DELETE FROM household_activity WHERE household_id = ?')->execute([$householdId]);
+    $pdo->prepare('DELETE FROM category_budgets WHERE household_id = ?')->execute([$householdId]);
     $pdo->prepare('DELETE FROM household_invites WHERE household_id = ?')->execute([$householdId]);
     $pdo->prepare('DELETE FROM transactions WHERE household_id = ?')->execute([$householdId]);
     $pdo->prepare('DELETE FROM recurring_entries WHERE household_id = ?')->execute([$householdId]);

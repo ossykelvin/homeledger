@@ -97,13 +97,7 @@ phpMyAdmin on port 8081 and MySQL on port 3306 are still separate services and a
 
 ## Recommended next phases
 
-1. Optional: use the stored `BREVO_API_KEY` for a later HTTP mailer if SMTP is not enough.
-2. Add budgets by category with threshold alerts.
-3. Add CSV import/export and encrypted backup/restore.
-4. Add account balances and transfer transactions.
-5. Add monthly reports, comparisons and printable summaries.
-6. Add notifications for upcoming or unusually high bills.
-7. Add automated integration and browser tests around CRUD, recurring generation and household isolation.
+See `BACKLOG.md`. Work in named batches (A spend control, B membership, C import/export, D accounts, E reports, F password reset, G ops, H tests). Do not start a new batch until the current one is merged unless it is G (ops), which can run in parallel.
 
 ## Acceptance checklist
 

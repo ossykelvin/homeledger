@@ -128,6 +128,12 @@ function create_household_category(string $name, string $type, string $colour = 
 
     $id = (int) db()->lastInsertId();
     bump_household_state(db(), $householdId);
+    log_household_activity(
+        $householdId,
+        current_actor_user_id(),
+        'category_added',
+        'Added ' . $type . ' category ' . $name
+    );
 
     return $id;
 }
@@ -170,13 +176,25 @@ function update_household_category(int $id, string $name, string $type, string $
     }
 
     bump_household_state(db(), $householdId);
+    if ($type === 'income') {
+        db()->prepare(
+            'DELETE FROM category_budgets WHERE household_id = ? AND category_id = ?'
+        )->execute([$householdId, $id]);
+    }
+    log_household_activity(
+        $householdId,
+        current_actor_user_id(),
+        'category_updated',
+        'Updated category ' . $name
+    );
 }
 
 function delete_household_category(int $id): void
 {
     assert_household_owner('Only the household owner can manage categories.');
 
-    if (find_household_category($id) === null) {
+    $existing = find_household_category($id);
+    if ($existing === null) {
         throw new InvalidArgumentException('Category not found.');
     }
 
@@ -195,6 +213,12 @@ function delete_household_category(int $id): void
     }
 
     bump_household_state(db(), $householdId);
+    log_household_activity(
+        $householdId,
+        current_actor_user_id(),
+        'category_deleted',
+        'Deleted category ' . (string) $existing['name']
+    );
 }
 
 /** @return list<array<string, mixed>> */

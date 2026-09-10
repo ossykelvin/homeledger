@@ -84,7 +84,18 @@
       if (dialog?.id === 'delete-account-dialog') {
         closeDialog(document.getElementById('profile-dialog'));
         openDialog(dialog);
-        syncDeleteAccountForm(dialog);
+        syncHouseholdIdConfirm(dialog);
+        return;
+      }
+      if (dialog?.id === 'remove-member-dialog') {
+        openDialog(dialog);
+        fillRemoveMemberForm(dialog, button);
+        syncHouseholdIdConfirm(dialog);
+        return;
+      }
+      if (dialog?.id === 'restore-backup-dialog') {
+        openDialog(dialog);
+        syncHouseholdIdConfirm(dialog);
         return;
       }
       if (dialog?.id === 'transaction-dialog') {
@@ -176,26 +187,62 @@
     });
   });
 
-  const syncDeleteAccountForm = (dialog) => {
+  const syncHouseholdIdConfirm = (dialog) => {
     const form = dialog?.querySelector('form');
     if (!form) return;
     const expected = (dialog.dataset.householdCode || '').replace(/[\s-]/g, '').toUpperCase();
     const typed = (form.querySelector('[name="confirm_household_id"]')?.value || '').replace(/[\s-]/g, '').toUpperCase();
     const needsTransfer = form.dataset.needsTransfer === '1';
     const transfer = form.querySelector('[name="transfer_user_id"]:checked');
+    const memberId = form.querySelector('[name="user_id"]');
+    const needsMember = !!memberId;
     const submit = form.querySelector('[type="submit"]');
-    if (submit) submit.disabled = !(expected !== '' && typed === expected && (!needsTransfer || !!transfer));
+    if (submit) {
+      submit.disabled = !(
+        expected !== ''
+        && typed === expected
+        && (!needsTransfer || !!transfer)
+        && (!needsMember || (memberId.value || '') !== '')
+      );
+    }
   };
 
-  const deleteDialog = document.getElementById('delete-account-dialog');
-  if (deleteDialog) {
-    deleteDialog.querySelector('[name="confirm_household_id"]')?.addEventListener('input', () => syncDeleteAccountForm(deleteDialog));
-    deleteDialog.querySelectorAll('[name="transfer_user_id"]').forEach((input) => {
-      input.addEventListener('change', () => syncDeleteAccountForm(deleteDialog));
+  const fillRemoveMemberForm = (dialog, button) => {
+    const form = dialog?.querySelector('form');
+    if (!form) return;
+    let payload = {};
+    try {
+      payload = JSON.parse(button?.dataset.removeMember || '{}');
+    } catch (error) {
+      payload = {};
+    }
+    const idField = form.querySelector('[name="user_id"]');
+    if (idField) idField.value = payload.id ? String(payload.id) : '';
+    const label = dialog.querySelector('#remove-member-label');
+    if (label) {
+      const name = payload.name || 'this member';
+      const email = payload.email ? ` (${payload.email})` : '';
+      label.textContent = name + email;
+    }
+    const idInput = form.querySelector('[name="confirm_household_id"]');
+    if (idInput) idInput.value = '';
+    const password = form.querySelector('[name="current_password"]');
+    if (password) password.value = '';
+  };
+
+  const bindHouseholdIdDialog = (dialog) => {
+    if (!dialog) return;
+    dialog.querySelector('[name="confirm_household_id"]')?.addEventListener('input', () => syncHouseholdIdConfirm(dialog));
+    dialog.querySelectorAll('[name="transfer_user_id"]').forEach((input) => {
+      input.addEventListener('change', () => syncHouseholdIdConfirm(dialog));
     });
-    deleteDialog.querySelector('form')?.addEventListener('reset', () => requestAnimationFrame(() => syncDeleteAccountForm(deleteDialog)));
-    syncDeleteAccountForm(deleteDialog);
-  }
+    dialog.querySelector('form')?.addEventListener('reset', () => requestAnimationFrame(() => syncHouseholdIdConfirm(dialog)));
+    syncHouseholdIdConfirm(dialog);
+  };
+
+  bindHouseholdIdDialog(document.getElementById('delete-account-dialog'));
+  bindHouseholdIdDialog(document.getElementById('remove-member-dialog'));
+  bindHouseholdIdDialog(document.getElementById('restore-backup-dialog'));
 
   const setPasswordShown = (button, shown) => {
     const input = button.closest('.password-field')?.querySelector('input');
@@ -242,7 +289,7 @@
   if (new URLSearchParams(window.location.search).get('delete') === '1') {
     const dialog = document.getElementById('delete-account-dialog');
     openDialog(dialog, false);
-    syncDeleteAccountForm(dialog);
+    syncHouseholdIdConfirm(dialog);
   } else if (new URLSearchParams(window.location.search).get('profile') === '1') {
     openDialog(document.getElementById('profile-dialog'), false);
   }

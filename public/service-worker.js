@@ -1,4 +1,4 @@
-const CACHE_NAME = 'homeledger-shell-v22';
+const CACHE_NAME = 'homeledger-shell-v24';
 const STATIC_ASSETS = [
   './assets/app.css',
   './assets/app.js',

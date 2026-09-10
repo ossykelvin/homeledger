@@ -15,7 +15,8 @@ HomeLedger is a household financial tracker built with PHP and MySQL. Each signe
 - Responsive light and dark modes based on the supplied Kokoszone theme
 - Installable desktop experience for Chrome and Microsoft Edge
 - Household sign-in and registration, including optional Sign in with Google. New password households confirm email before first sign-in. Google sign-in and invite joins skip that extra email. Every money row is scoped to a `household_id`.
-- Household hub (`?page=household`): name, public household ID, members, and 24-hour invites with resend. `?page=invite` redirects here.
+- Household hub (`?page=household`): name, public household ID, members, owner member removal, activity log, and 24-hour invites with resend. `?page=invite` redirects here.
+- Categories: owner-managed labels plus monthly expense budgets, with overspend warnings on Overview and Statement
 - Settings: signed-in users open the profile icon in the top bar to change display name, household name, and password, or to permanently delete their account. Email and household ID are read-only.
 - Prepared statements, output escaping, CSRF protection and server-side validation
 
@@ -43,6 +44,7 @@ Requirements: Docker Desktop with Docker Compose.
    Get-Content -Raw .\database\migrations\007_email_confirmation.sql | docker compose exec -T db mysql -u homeledger -pchange-this-password homeledger
    Get-Content -Raw .\database\migrations\008_household_owner_user.sql | docker compose exec -T db mysql -u homeledger -pchange-this-password homeledger
    Get-Content -Raw .\database\migrations\009_google_sub.sql | docker compose exec -T db mysql -u homeledger -pchange-this-password homeledger
+   Get-Content -Raw .\database\migrations\010_budgets_activity.sql | docker compose exec -T db mysql -u homeledger -pchange-this-password homeledger
    ```
 
    If `003` stopped mid-run, apply `003b_finish_transaction_household.sql` before `004`. Do not run `docker compose down -v`.
@@ -94,7 +96,7 @@ Requirements: PHP 8.1 or later, MySQL 8 or MariaDB 10.6 or later, and the PDO My
 6. Configure the variables shown in `.env.example` through the hosting control panel or Apache environment configuration.
 7. Use HTTPS before installing the PWA or making the site available beyond localhost. Create the owner account on first visit.
 
-For Namecheap cPanel Git Version Control, keep the clone at `~/homeledger` and the document root at `~/homeledger/public` (not `public_html`). `.cpanel.yml` copies `app`, `templates`, `public`, `scripts`, and `database` into `$HOME/homeledger` when the Git clone is a separate folder. If the clone is already that path, deploy is a no-op after pull. It never copies `.env` and never imports `schema.sql` or runs migrations. After a GitHub push: cPanel → Files → Git Version Control → Manage → **Update from Remote**, then **Deploy HEAD Commit**. If cPanel still reports uncommitted changes, those are local edits on the server checkout (often leftover File Manager uploads). Discard tracked files there and leave `.env` untracked. Do not commit `.env` from the server. Apply `database/migrations/007_email_confirmation.sql`, `008_household_owner_user.sql` and `009_google_sub.sql` in phpMyAdmin yourself.
+For Namecheap cPanel Git Version Control, keep the clone at `~/homeledger` and the document root at `~/homeledger/public` (not `public_html`). `.cpanel.yml` copies `app`, `templates`, `public`, `scripts`, and `database` into `$HOME/homeledger` when the Git clone is a separate folder. If the clone is already that path, deploy is a no-op after pull. It never copies `.env` and never imports `schema.sql` or runs migrations. After a GitHub push: cPanel → Files → Git Version Control → Manage → **Update from Remote**, then **Deploy HEAD Commit**. If cPanel still reports uncommitted changes, those are local edits on the server checkout (often leftover File Manager uploads). Discard tracked files there and leave `.env` untracked. Do not commit `.env` from the server. Apply `database/migrations/007_email_confirmation.sql`, `008_household_owner_user.sql`, `009_google_sub.sql` and `010_budgets_activity.sql` in phpMyAdmin yourself.
 
 The `.env.example` file documents the expected values. The application reads real operating-system environment variables and does not load `.env` files by itself.
 
@@ -126,7 +128,7 @@ php scripts/process_recurring.php 2026-12-31
 
 ## Household
 
-Signed-in members open **Household** to see the household name (editable), the public household ID (read-only, `A3K9-M2PQ-7X2B-Q8NL` format), the member list, and invites. The owner is stored as `households.owner_user_id` (the household creator, or whoever later received ownership). That is a display and invite-permission label; everyone still has the same access to the ledger. `?page=invite` redirects to Household.
+Signed-in members open **Household** to see the household name (editable), the public household ID (read-only, `A3K9-M2PQ-7X2B-Q8NL` format), the member list, activity, and invites. The owner is stored as `households.owner_user_id` (the household creator, or whoever later received ownership). That is a display and invite-permission label; everyone still has the same access to the ledger. The owner can remove a non-owner member after typing the household ID and current password. `?page=invite` redirects to Household.
 
 Send a 24-hour join link from the same page. When `MAIL_*` is set, HomeLedger sends the invite over SMTP (STARTTLS). The page always shows the URL to copy. **Resend** on a pending or expired unused invite issues a new token, resets expiry to 24 hours, and retires the old link.
 
@@ -156,7 +158,7 @@ The Sign in with Google button is shown on login and register only when `GOOGLE_
    docker compose up -d --force-recreate --no-deps app
    ```
 
-Do not run `docker compose down -v`. Live volumes also need `database/migrations/009_google_sub.sql` applied once.
+Do not run `docker compose down -v`. Live volumes also need `database/migrations/009_google_sub.sql` applied once. Apply `database/migrations/010_budgets_activity.sql` for monthly budgets, household activity and spend-alert keys.
 
 Google start is `/?page=google`. The callback is `/?page=google-callback`. The redirect URI sent to Google is `rtrim(APP_URL, '/') . '/?page=google-callback'`, except on localhost Docker browse where it is `http://localhost:8080/?page=google-callback`. A signed-in Google user is treated as email-verified (no extra confirm email). An existing `users.login` match is signed in and the password is not used. A new email creates a household and owner and seeds categories, unless an invite token is in the session or query, in which case they join that household. Locked accounts stay locked.
 
@@ -188,6 +190,9 @@ php tests/household_state_test.php
 php tests/account_delete_test.php
 php tests/categories_test.php
 php tests/google_oauth_test.php
+php tests/budgets_test.php
+php tests/household_members_test.php
+php tests/portability_test.php
 find app public scripts tests templates -name '*.php' -print0 | xargs -0 -n1 php -l
 ```
 
@@ -195,6 +200,6 @@ find app public scripts tests templates -name '*.php' -print0 | xargs -0 -n1 php
 
 This MVP can host more than one household on the same server. App pages require a signed-in user. Queries only return rows for that user's `household_id`. Uninvited registration creates a new household (the first account on a live volume with existing transactions keeps that ledger). Extra people join through a 24-hour invite.
 
-App login does not protect phpMyAdmin on port 8081 or MySQL on port 3306. Change the example Compose passwords before any LAN or internet use. Before a public launch, also add encrypted backups, secret management and a tested recovery process.
+App login does not protect phpMyAdmin on port 8081 or MySQL on port 3306. Change the example Compose passwords before any LAN or internet use. Encrypted household backups use a passphrase you choose on the Household page. Keep that passphrase somewhere safe; HomeLedger cannot recover it.
 
 See `HANDOVER.md` for architecture, product decisions and recommended next steps.
